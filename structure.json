@@ -1,0 +1,732 @@
+{
+  "metadata": {
+    "version": 1,
+    "generatedAt": "2025-08-25T22:13:02.912Z"
+  },
+  "tree": {
+    "name": "ARCHIVE_BOT",
+    "path": ".",
+    "kind": "dir",
+    "description": "ARCHIVE_BOT directory.",
+    "children": [
+      {
+        "name": "bot",
+        "path": "bot",
+        "kind": "dir",
+        "description": "bot directory.",
+        "children": [
+          {
+            "name": "config",
+            "path": "bot/config",
+            "kind": "dir",
+            "description": "config directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "bot/config/__init__.py",
+                "kind": "file",
+                "description": "Load configuration values from environment variables.",
+                "sizeBytes": 910,
+                "lines": 37,
+                "language": "Python"
+              },
+              {
+                "name": "constants.py",
+                "path": "bot/config/constants.py",
+                "kind": "file",
+                "description": "Non-secret configuration constants.",
+                "sizeBytes": 94,
+                "lines": 6,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "db",
+            "path": "bot/db",
+            "kind": "dir",
+            "description": "db directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "bot/db/__init__.py",
+                "kind": "file",
+                "description": "Unified DB package with convenient re-exports.",
+                "sizeBytes": 1074,
+                "lines": 38,
+                "language": "Python"
+              },
+              {
+                "name": "admins.py",
+                "path": "bot/db/admins.py",
+                "kind": "file",
+                "description": "Permission bit flags",
+                "sizeBytes": 5705,
+                "lines": 189,
+                "language": "Python"
+              },
+              {
+                "name": "base.py",
+                "path": "bot/db/base.py",
+                "kind": "file",
+                "description": "Apply additive schema updates (DB v2).",
+                "sizeBytes": 5464,
+                "lines": 156,
+                "language": "Python"
+              },
+              {
+                "name": "groups.py",
+                "path": "bot/db/groups.py",
+                "kind": "file",
+                "description": "INSERT INTO groups (tg_chat_id, title, level_id, term_id) VALUES (?, ?, ?, ?) ON CONFLICT(tg_chat_id) DO UPDATE SET title=excluded.title, level_id=excluded.level_id, term_id=excluded.term_id",
+                "sizeBytes": 998,
+                "lines": 33,
+                "language": "Python"
+              },
+              {
+                "name": "ingestions.py",
+                "path": "bot/db/ingestions.py",
+                "kind": "file",
+                "description": "INSERT INTO ingestions ( tg_message_id, admin_id, status, action, file_unique_id ) VALUES (?, ?, ?, ?, ?)",
+                "sizeBytes": 3487,
+                "lines": 122,
+                "language": "Python"
+              },
+              {
+                "name": "lecturers.py",
+                "path": "bot/db/lecturers.py",
+                "kind": "file",
+                "description": "Return id for lecturer *name*, inserting if necessary.",
+                "sizeBytes": 604,
+                "lines": 24,
+                "language": "Python"
+              },
+              {
+                "name": "materials.py",
+                "path": "bot/db/materials.py",
+                "kind": "file",
+                "description": "Ensure the ``file_unique_id`` column exists on ``materials`` table.",
+                "sizeBytes": 16867,
+                "lines": 497,
+                "language": "Python"
+              },
+              {
+                "name": "seed_admins.py",
+                "path": "bot/db/seed_admins.py",
+                "kind": "file",
+                "description": "Utility to seed admin accounts.  Currently only supports inserting the bot owner with full permissions.",
+                "sizeBytes": 1329,
+                "lines": 53,
+                "language": "Python"
+              },
+              {
+                "name": "subjects.py",
+                "path": "bot/db/subjects.py",
+                "kind": "file",
+                "description": "-----------------------------------------------------------------------------",
+                "sizeBytes": 8123,
+                "lines": 232,
+                "language": "Python"
+              },
+              {
+                "name": "term_resources.py",
+                "path": "bot/db/term_resources.py",
+                "kind": "file",
+                "description": "INSERT INTO term_resources (term_id, kind, tg_storage_chat_id, tg_storage_msg_id) VALUES (?, ?, ?, ?)",
+                "sizeBytes": 1015,
+                "lines": 40,
+                "language": "Python"
+              },
+              {
+                "name": "topics.py",
+                "path": "bot/db/topics.py",
+                "kind": "file",
+                "description": "SELECT t.subject_id, s.name, t.section FROM topics t JOIN groups g ON g.id = t.group_id JOIN subjects s ON s.id = t.subject_id WHERE g.tg_chat_id=? AND t.tg_topic_id=?",
+                "sizeBytes": 1903,
+                "lines": 58,
+                "language": "Python"
+              },
+              {
+                "name": "years.py",
+                "path": "bot/db/years.py",
+                "kind": "file",
+                "description": "Return id for *name*, inserting a new year if needed.",
+                "sizeBytes": 522,
+                "lines": 21,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "handlers",
+            "path": "bot/handlers",
+            "kind": "dir",
+            "description": "handlers directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "bot/handlers/__init__.py",
+                "kind": "file",
+                "description": "Convenience re-exports for handler callables.",
+                "sizeBytes": 809,
+                "lines": 28,
+                "language": "Python"
+              },
+              {
+                "name": "admins.py",
+                "path": "bot/handlers/admins.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 8960,
+                "lines": 237,
+                "language": "Python"
+              },
+              {
+                "name": "approvals.py",
+                "path": "bot/handlers/approvals.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 5277,
+                "lines": 138,
+                "language": "Python"
+              },
+              {
+                "name": "groups.py",
+                "path": "bot/handlers/groups.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 5360,
+                "lines": 153,
+                "language": "Python"
+              },
+              {
+                "name": "ingestion.py",
+                "path": "bot/handlers/ingestion.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 8799,
+                "lines": 262,
+                "language": "Python"
+              },
+              {
+                "name": "misc.py",
+                "path": "bot/handlers/misc.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 1495,
+                "lines": 48,
+                "language": "Python"
+              },
+              {
+                "name": "moderation.py",
+                "path": "bot/handlers/moderation.py",
+                "kind": "file",
+                "description": "Delete messages from users without posting rights.  If a user who is not permitted to send messages posts in a group, the message is removed and a private explanation is sent to the user.",
+                "sizeBytes": 1247,
+                "lines": 49,
+                "language": "Python"
+              },
+              {
+                "name": "navigation.py",
+                "path": "bot/handlers/navigation.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 35871,
+                "lines": 734,
+                "language": "Python"
+              },
+              {
+                "name": "start.py",
+                "path": "bot/handlers/start.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 695,
+                "lines": 19,
+                "language": "Python"
+              },
+              {
+                "name": "topics.py",
+                "path": "bot/handlers/topics.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 8454,
+                "lines": 223,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "jobs",
+            "path": "bot/jobs",
+            "kind": "dir",
+            "description": "jobs directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "bot/jobs/__init__.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 78,
+                "lines": 6,
+                "language": "Python"
+              },
+              {
+                "name": "cleanup.py",
+                "path": "bot/jobs/cleanup.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 253,
+                "lines": 12,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "keyboards",
+            "path": "bot/keyboards",
+            "kind": "dir",
+            "description": "keyboards directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "bot/keyboards/__init__.py",
+                "kind": "file",
+                "description": "Re-export common keyboard builders.",
+                "sizeBytes": 131,
+                "lines": 5,
+                "language": "Python"
+              },
+              {
+                "name": "admins.py",
+                "path": "bot/keyboards/admins.py",
+                "kind": "file",
+                "description": "Create an inline keyboard to toggle available admin permissions.",
+                "sizeBytes": 734,
+                "lines": 23,
+                "language": "Python"
+              },
+              {
+                "name": "builders.py",
+                "path": "bot/keyboards/builders.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 9253,
+                "lines": 273,
+                "language": "Python"
+              },
+              {
+                "name": "constants.py",
+                "path": "bot/keyboards/constants.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 2783,
+                "lines": 80,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "navigation",
+            "path": "bot/navigation",
+            "kind": "dir",
+            "description": "navigation directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "bot/navigation/__init__.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 67,
+                "lines": 5,
+                "language": "Python"
+              },
+              {
+                "name": "state.py",
+                "path": "bot/navigation/state.py",
+                "kind": "file",
+                "description": "Navigation state management as a class.  This module defines :class:`NavigationState` which encapsulates all logic that previously lived as standalone helper functions.  The class stores a reference to ``user_data`` provided by ``telegram.ext`` and exposes methods such as ``set_level`` and ``back_one`` to manipulate the navigation stack.",
+                "sizeBytes": 5030,
+                "lines": 155,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "parser",
+            "path": "bot/parser",
+            "kind": "dir",
+            "description": "parser directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "bot/parser/__init__.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 0,
+                "lines": 1,
+                "language": "Python"
+              },
+              {
+                "name": "hashtags.py",
+                "path": "bot/parser/hashtags.py",
+                "kind": "file",
+                "description": "Parsing utilities for hashtag based ingestion.  The new ingestion flow relies solely on plain text contained in the caption or message body.  ``telegram`` entities are intentionally ignored so the parsing logic here works with raw text only.  The helpers normalise hidden direction markers, convert Eastern Arabic digits to their Latin representation and then extract structured information from the ordered list of hashtags.  The parser understands a small, fixed set of Arabic hashtags that indicate the *content type* in addition to generic tags for the lecture number, year and lecturer name.  The order of these tags is significant and is validated according to the rules described in :mod:`README`.",
+                "sizeBytes": 8877,
+                "lines": 234,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "utils",
+            "path": "bot/utils",
+            "kind": "dir",
+            "description": "utils directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "bot/utils/__init__.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 0,
+                "lines": 1,
+                "language": "Python"
+              },
+              {
+                "name": "conv.py",
+                "path": "bot/utils/conv.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 610,
+                "lines": 25,
+                "language": "Python"
+              },
+              {
+                "name": "formatting.py",
+                "path": "bot/utils/formatting.py",
+                "kind": "file",
+                "description": "Return Arabic ordinal word for *n* if known.",
+                "sizeBytes": 709,
+                "lines": 31,
+                "language": "Python"
+              },
+              {
+                "name": "logging.py",
+                "path": "bot/utils/logging.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 199,
+                "lines": 10,
+                "language": "Python"
+              },
+              {
+                "name": "telegram.py",
+                "path": "bot/utils/telegram.py",
+                "kind": "file",
+                "description": "Return a link to a message in the archive channel.  If a public ``username`` is provided, build a public t.me link. Otherwise, fall back to the private ``t.me/c`` format using the internal channel ID. If ``archive_chat_id`` is falsy, ``None`` is returned.",
+                "sizeBytes": 2136,
+                "lines": 71,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "__init__.py",
+            "path": "bot/__init__.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 0,
+            "lines": 1,
+            "language": "Python"
+          },
+          {
+            "name": "__main__.py",
+            "path": "bot/__main__.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 62,
+            "lines": 5,
+            "language": "Python"
+          },
+          {
+            "name": "main.py",
+            "path": "bot/main.py",
+            "kind": "file",
+            "description": "main.py",
+            "sizeBytes": 3511,
+            "lines": 122,
+            "language": "Python"
+          },
+          {
+            "name": "seed_loader.py",
+            "path": "bot/seed_loader.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 3269,
+            "lines": 117,
+            "language": "Python"
+          }
+        ]
+      },
+      {
+        "name": "database",
+        "path": "database",
+        "kind": "dir",
+        "description": "Database files.",
+        "children": [
+          {
+            "name": "archive.db",
+            "path": "database/archive.db",
+            "kind": "file",
+            "description": "File.",
+            "sizeBytes": 159744,
+            "lines": 237
+          },
+          {
+            "name": "init.sql",
+            "path": "database/init.sql",
+            "kind": "file",
+            "description": "File.",
+            "sizeBytes": 6103,
+            "lines": 178
+          }
+        ]
+      },
+      {
+        "name": "docs",
+        "path": "docs",
+        "kind": "dir",
+        "description": "Documentation.",
+        "children": [
+          {
+            "name": "caption_templates.md",
+            "path": "docs/caption_templates.md",
+            "kind": "file",
+            "description": "قوالب الكابتشن",
+            "sizeBytes": 1036,
+            "lines": 52,
+            "language": "Markdown"
+          },
+          {
+            "name": "content-upload.md",
+            "path": "docs/content-upload.md",
+            "kind": "file",
+            "description": "رفع المحتوى",
+            "sizeBytes": 1738,
+            "lines": 42,
+            "language": "Markdown"
+          },
+          {
+            "name": "group-linking.md",
+            "path": "docs/group-linking.md",
+            "kind": "file",
+            "description": "ربط المجموعات",
+            "sizeBytes": 1419,
+            "lines": 26,
+            "language": "Markdown"
+          },
+          {
+            "name": "moderators_guide_ar.md",
+            "path": "docs/moderators_guide_ar.md",
+            "kind": "file",
+            "description": "دليل المشرفين",
+            "sizeBytes": 2991,
+            "lines": 44,
+            "language": "Markdown"
+          },
+          {
+            "name": "owner-guide.md",
+            "path": "docs/owner-guide.md",
+            "kind": "file",
+            "description": "دليل المالك",
+            "sizeBytes": 1298,
+            "lines": 27,
+            "language": "Markdown"
+          },
+          {
+            "name": "user_guide_ar.md",
+            "path": "docs/user_guide_ar.md",
+            "kind": "file",
+            "description": "دليل المستخدمين",
+            "sizeBytes": 1874,
+            "lines": 28,
+            "language": "Markdown"
+          }
+        ]
+      },
+      {
+        "name": "keyboards",
+        "path": "keyboards",
+        "kind": "dir",
+        "description": "keyboards directory.",
+        "children": [
+          {
+            "name": "builders",
+            "path": "keyboards/builders",
+            "kind": "dir",
+            "description": "builders directory.",
+            "children": [
+              {
+                "name": "__init__.py",
+                "path": "keyboards/builders/__init__.py",
+                "kind": "file",
+                "description": "Python source file.",
+                "sizeBytes": 0,
+                "lines": 1,
+                "language": "Python"
+              }
+            ]
+          },
+          {
+            "name": "__init__.py",
+            "path": "keyboards/__init__.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 0,
+            "lines": 1,
+            "language": "Python"
+          }
+        ]
+      },
+      {
+        "name": "scripts",
+        "path": "scripts",
+        "kind": "dir",
+        "description": "Utility scripts.",
+        "children": [
+          {
+            "name": "check_db_import.py",
+            "path": "scripts/check_db_import.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 419,
+            "lines": 13,
+            "language": "Python"
+          },
+          {
+            "name": "dev_check.py",
+            "path": "scripts/dev_check.py",
+            "kind": "file",
+            "description": "!/usr/bin/env python3",
+            "sizeBytes": 502,
+            "lines": 20,
+            "language": "Python"
+          },
+          {
+            "name": "generate-structure.mjs",
+            "path": "scripts/generate-structure.mjs",
+            "kind": "file",
+            "description": "JavaScript source file.",
+            "sizeBytes": 5940,
+            "lines": 196,
+            "language": "JavaScript"
+          },
+          {
+            "name": "sanity_imports.py",
+            "path": "scripts/sanity_imports.py",
+            "kind": "file",
+            "description": "!/usr/bin/env python3",
+            "sizeBytes": 1240,
+            "lines": 45,
+            "language": "Python"
+          },
+          {
+            "name": "smoke_checks.py",
+            "path": "scripts/smoke_checks.py",
+            "kind": "file",
+            "description": "!/usr/bin/env python3",
+            "sizeBytes": 3459,
+            "lines": 93,
+            "language": "Python"
+          }
+        ]
+      },
+      {
+        "name": "tests",
+        "path": "tests",
+        "kind": "dir",
+        "description": "Test suite.",
+        "children": [
+          {
+            "name": "test_formatting.py",
+            "path": "tests/test_formatting.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 213,
+            "lines": 10,
+            "language": "Python"
+          }
+        ]
+      },
+      {
+        "name": ".env.example",
+        "path": ".env.example",
+        "kind": "file",
+        "description": "Telegram channel ID where messages will be archived",
+        "sizeBytes": 161,
+        "lines": 9
+      },
+      {
+        "name": ".gitattributes",
+        "path": ".gitattributes",
+        "kind": "file",
+        "description": "Auto detect text files and perform LF normalization",
+        "sizeBytes": 66,
+        "lines": 3
+      },
+      {
+        "name": ".gitignore",
+        "path": ".gitignore",
+        "kind": "file",
+        "description": "Byte-compiled / optimized / DLL files",
+        "sizeBytes": 4688,
+        "lines": 208
+      },
+      {
+        "name": "data.py",
+        "path": "data.py",
+        "kind": "file",
+        "description": "Python source file.",
+        "sizeBytes": 436,
+        "lines": 21,
+        "language": "Python"
+      },
+      {
+        "name": "package.json",
+        "path": "package.json",
+        "kind": "file",
+        "description": "Project configuration and dependencies.",
+        "sizeBytes": 145,
+        "lines": 9,
+        "language": "JSON"
+      },
+      {
+        "name": "README.md",
+        "path": "README.md",
+        "kind": "file",
+        "description": "Project overview and instructions.",
+        "sizeBytes": 2484,
+        "lines": 82,
+        "language": "Markdown"
+      },
+      {
+        "name": "requirements.txt",
+        "path": "requirements.txt",
+        "kind": "file",
+        "description": "Text file.",
+        "sizeBytes": 73,
+        "lines": 6,
+        "language": "Text"
+      },
+      {
+        "name": "seed_data.json",
+        "path": "seed_data.json",
+        "kind": "file",
+        "description": "JSON file.",
+        "sizeBytes": 1108,
+        "lines": 35,
+        "language": "JSON"
+      }
+    ]
+  }
+}
