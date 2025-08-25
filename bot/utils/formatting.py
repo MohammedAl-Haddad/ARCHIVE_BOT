@@ -23,7 +23,7 @@ def to_display_name(value: str) -> str:
     """Normalize *value* by removing direction markers and underscores."""
     if not value:
         return ""
-    cleaned = re.sub(r"[\u200e\u200f]", "", value)
+    cleaned = re.sub(r"[‎‏]", "", value)
     return cleaned.replace("_", " ").strip()
 
 
