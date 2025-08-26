@@ -166,11 +166,10 @@ async def render_state(update: Update, context: ContextTypes.DEFAULT_TYPE):
         section_code = nav.data.get("section")
         lecturer_label = stack[-1][1]
         lecturer_id = nav.data.get("lecturer_id")
-        years = await get_years_for_subject_section_lecturer(subject_id, section_code, lecturer_id)
         lectures_exist = await has_lecture_category(subject_id, section_code) or False
         return await update.message.reply_text(
             f"المحاضر: {lecturer_label}\nاختر خيارًا:",
-            reply_markup=generate_lecturer_filter_keyboard(bool(years), lectures_exist),
+            reply_markup=generate_lecturer_filter_keyboard(False, lectures_exist),
         )
 
     if top_type == "year_list":
@@ -497,11 +496,10 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text in lect_map:
             lecturer_id = lect_map[text]
             nav.set_lecturer(text, lecturer_id)
-            years = await get_years_for_subject_section_lecturer(subject_id, section_code, lecturer_id)
             lectures_exist = await get_lectures_by_lecturer(subject_id, section_code, lecturer_id)
             return await update.message.reply_text(
                 f"المحاضر: {text}\nاختر خيارًا:",
-                reply_markup=generate_lecturer_filter_keyboard(bool(years), bool(lectures_exist)),
+                reply_markup=generate_lecturer_filter_keyboard(False, bool(lectures_exist)),
             )
 
     # 8.2.1) داخل قائمة المحاضر: اختر السنة/عرض كل محاضرات هذا المحاضر
@@ -519,30 +517,29 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 subject_id, section_code, lecturer_id
             )
             if not years:
-                years_exist = False
                 lectures_exist = await get_lectures_by_lecturer(
                     subject_id, section_code, lecturer_id
                 )
                 return await update.message.reply_text(
                     "لا توجد سنوات مرتبطة بمحاضرات هذا المحاضر.",
                     reply_markup=generate_lecturer_filter_keyboard(
-                        years_exist, bool(lectures_exist)
+                        False, bool(lectures_exist)
                     ),
                 )
             nav.push_view("year_list")
-            return await update.message.reply_text(f"المحاضر: {lecturer_label}\nاختر السنة:", reply_markup=generate_years_keyboard(years))
+            return await update.message.reply_text(
+                f"المحاضر: {lecturer_label}\nاختر السنة:",
+                reply_markup=generate_years_keyboard(years),
+            )
 
         if text == LIST_LECTURES_FOR_LECTURER:
             lectures, markup, lectures_map = await _prepare_lectures_menu(
                 subject_id, section_code, lecturer_id=lecturer_id
             )
             if not lectures:
-                years = await get_years_for_subject_section_lecturer(
-                    subject_id, section_code, lecturer_id
-                )
                 return await update.message.reply_text(
                     "لا توجد محاضرات لهذا المحاضر.",
-                    reply_markup=generate_lecturer_filter_keyboard(bool(years), False),
+                    reply_markup=generate_lecturer_filter_keyboard(False, False),
                 )
             nav.push_view("lecture_list")
             nav.data["lectures_map"] = lectures_map
