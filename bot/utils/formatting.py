@@ -27,4 +27,23 @@ def to_display_name(value: str) -> str:
     return cleaned.replace("_", " ").strip()
 
 
-__all__ = ["arabic_ordinal", "to_display_name"]
+def format_lecturer_name(name: str, title: str = "الدكتور") -> str:
+    """Return *name* prefixed with *title* if not already titled.
+
+    The input is first normalized using :func:`to_display_name`.  If the
+    resulting name already starts with a common academic title (e.g. ``"د."``
+    or ``"الدكتور"``/``"الدكتورة"``), it is returned unchanged.  Otherwise
+    the provided *title* is prepended.
+    """
+
+    display = to_display_name(name)
+    if not display:
+        return ""
+
+    prefixes = ("د.", "دكتور", "الدكتور", "دكتورة", "الدكتورة")
+    if any(display.startswith(p) for p in prefixes):
+        return display
+    return f"{title} {display}"
+
+
+__all__ = ["arabic_ordinal", "to_display_name", "format_lecturer_name"]

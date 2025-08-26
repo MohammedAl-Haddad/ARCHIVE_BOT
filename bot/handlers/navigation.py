@@ -64,7 +64,7 @@ from ..keyboards.builders import (
     build_exam_menu,
 )
 
-from ..utils.formatting import arabic_ordinal, to_display_name
+from ..utils.formatting import arabic_ordinal, format_lecturer_name
 from ..utils.telegram import build_archive_link
 from ..config import ARCHIVE_CHANNEL_ID
 
@@ -430,7 +430,7 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "لا يوجد محاضرون مرتبطون بهذا القسم.",
                     reply_markup=generate_subject_sections_keyboard_dynamic([]),
                 )
-            lect_map = {to_display_name(name): _id for _id, name in lecturers}
+            lect_map = {format_lecturer_name(name): _id for _id, name in lecturers}
             nav.data["lecturers_map"] = lect_map
             nav.push_view("lecturer_list")
             return await update.message.reply_text(
@@ -544,7 +544,7 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             nav.push_view("lecture_list")
             nav.data["lectures_map"] = lectures_map
             return await update.message.reply_text(
-                f"محاضرات الدكتور {lecturer_label}:",
+                f"محاضرات {lecturer_label}:",
                 reply_markup=markup,
             )
 
