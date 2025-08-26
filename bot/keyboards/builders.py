@@ -14,7 +14,6 @@ from .constants import (
     YEAR_MENU_LECTURES,
     SECTION_LABELS,
     CATEGORY_TO_LABEL,
-    CHOOSE_YEAR_FOR_LECTURER,
     LIST_LECTURES_FOR_LECTURER,
 )
 
@@ -166,8 +165,6 @@ def generate_lecturer_filter_keyboard(
 ) -> ReplyKeyboardMarkup:
     """Provide filters when viewing a lecturer."""
     row: list[str] = []
-    if years_exist:
-        row.append(CHOOSE_YEAR_FOR_LECTURER)
     if lectures_exist:
         row.append(LIST_LECTURES_FOR_LECTURER)
 
