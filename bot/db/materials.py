@@ -447,9 +447,8 @@ async def get_years(subject_id: int, section: str) -> list[int]:
     return [int(name) for _id, name in rows]
 
 
-async def get_lectures_by_year(subject_id: int, section: str, year_id: int) -> list[dict]:
-    """Return lectures within a specific *year_id* with extracted numbers."""
-    titles = await list_lecture_titles_by_year(subject_id, section, year_id)
+def _titles_to_lectures(titles: list[str]) -> list[dict]:
+    """Convert raw *titles* to structured lecture info."""
     lectures: list[dict] = []
     for t in titles:
         m = re.search(r"(\d+)", t)
@@ -457,6 +456,36 @@ async def get_lectures_by_year(subject_id: int, section: str, year_id: int) -> l
         title = t.split(":", 1)[1].strip() if ":" in t else ""
         lectures.append({"lecture_no": no, "title": title, "raw": t})
     return lectures
+
+
+async def get_lectures(subject_id: int, section: str) -> list[dict]:
+    """Return all lectures for *subject* and *section*."""
+    titles = await list_lecture_titles(subject_id, section)
+    return _titles_to_lectures(titles)
+
+
+async def get_lectures_by_lecturer(
+    subject_id: int, section: str, lecturer_id: int
+) -> list[dict]:
+    """Return lectures filtered by *lecturer_id*."""
+    titles = await list_lecture_titles_by_lecturer(subject_id, section, lecturer_id)
+    return _titles_to_lectures(titles)
+
+
+async def get_lectures_by_lecturer_year(
+    subject_id: int, section: str, lecturer_id: int, year_id: int
+) -> list[dict]:
+    """Return lectures for a given lecturer and year."""
+    titles = await list_lecture_titles_by_lecturer_year(
+        subject_id, section, lecturer_id, year_id
+    )
+    return _titles_to_lectures(titles)
+
+
+async def get_lectures_by_year(subject_id: int, section: str, year_id: int) -> list[dict]:
+    """Return lectures within a specific *year_id* with extracted numbers."""
+    titles = await list_lecture_titles_by_year(subject_id, section, year_id)
+    return _titles_to_lectures(titles)
 
 
 async def get_types_for_lecture(
