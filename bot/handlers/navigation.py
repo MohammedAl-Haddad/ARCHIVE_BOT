@@ -21,7 +21,7 @@ from bot.db import (
     get_years,
     get_lectures,
     get_lectures_by_year,
-    get_lectures_by_lecturer,
+    get_lectures_for_lecturer,
     get_lectures_by_lecturer_year,
     get_types_for_lecture,
     get_year_specials,
@@ -85,7 +85,7 @@ async def _prepare_lectures_menu(
             subject_id, section_code, lecturer_id, year_id
         )
     elif lecturer_id:
-        lectures = await get_lectures_by_lecturer(subject_id, section_code, lecturer_id)
+        lectures = await get_lectures_for_lecturer(subject_id, section_code, lecturer_id)
     elif year_id:
         lectures = await get_lectures_by_year(subject_id, section_code, year_id)
     else:
@@ -496,7 +496,7 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text in lect_map:
             lecturer_id = lect_map[text]
             nav.set_lecturer(text, lecturer_id)
-            lectures_exist = await get_lectures_by_lecturer(subject_id, section_code, lecturer_id)
+            lectures_exist = await get_lectures_for_lecturer(subject_id, section_code, lecturer_id)
             return await update.message.reply_text(
                 f"المحاضر: {text}\nاختر خيارًا:",
                 reply_markup=generate_lecturer_filter_keyboard(False, bool(lectures_exist)),
@@ -517,7 +517,7 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 subject_id, section_code, lecturer_id
             )
             if not years:
-                lectures_exist = await get_lectures_by_lecturer(
+                lectures_exist = await get_lectures_for_lecturer(
                     subject_id, section_code, lecturer_id
                 )
                 return await update.message.reply_text(
