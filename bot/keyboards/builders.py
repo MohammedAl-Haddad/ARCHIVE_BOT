@@ -160,9 +160,7 @@ def generate_lecture_titles_keyboard(titles: list[str]) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 
-def generate_lecturer_filter_keyboard(
-    years_exist: bool, lectures_exist: bool
-) -> ReplyKeyboardMarkup:
+def generate_lecturer_filter_keyboard(lectures_exist: bool) -> ReplyKeyboardMarkup:
     """Provide filters when viewing a lecturer."""
     row: list[str] = []
     if lectures_exist:

@@ -42,7 +42,6 @@ CATEGORY_TO_LABEL = {
 }
 LABEL_TO_CATEGORY = {v: k for k, v in CATEGORY_TO_LABEL.items()}
 
-CHOOSE_YEAR_FOR_LECTURER   = "📅 اختر السنة"
 LIST_LECTURES_FOR_LECTURER = "📚 محاضرات هذا المحاضر"
 
 main_menu = ReplyKeyboardMarkup(
@@ -73,7 +72,6 @@ __all__ = [
     "LABEL_TO_SECTION",
     "CATEGORY_TO_LABEL",
     "LABEL_TO_CATEGORY",
-    "CHOOSE_YEAR_FOR_LECTURER",
     "LIST_LECTURES_FOR_LECTURER",
     "main_menu",
 ]
