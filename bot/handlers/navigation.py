@@ -12,17 +12,17 @@ from bot.db import (
     get_lecturers_for_subject_section,
     has_lecture_category,
     get_years_for_subject_section_lecturer,
-    list_lecture_titles,
     list_lecture_titles_by_year,
-    list_lecture_titles_by_lecturer,
-    list_lecture_titles_by_lecturer_year,
     get_subject_id_by_name,
     get_materials_by_category,
     get_lecture_materials,
     list_categories_for_subject_section_year,
     list_categories_for_lecture,
     get_years,
+    get_lectures,
     get_lectures_by_year,
+    get_lectures_by_lecturer,
+    get_lectures_by_lecturer_year,
     get_types_for_lecture,
     get_year_specials,
 )
@@ -71,6 +71,34 @@ from ..config import ARCHIVE_CHANNEL_ID
 logger = logging.getLogger("bot.navigation")
 
 from ..navigation import NavigationState
+
+
+async def _prepare_lectures_menu(
+    subject_id: int,
+    section_code: str,
+    year_id: int | None = None,
+    lecturer_id: int | None = None,
+):
+    """Fetch lectures and build a menu with a lookup map."""
+    if year_id and lecturer_id:
+        lectures = await get_lectures_by_lecturer_year(
+            subject_id, section_code, lecturer_id, year_id
+        )
+    elif lecturer_id:
+        lectures = await get_lectures_by_lecturer(subject_id, section_code, lecturer_id)
+    elif year_id:
+        lectures = await get_lectures_by_year(subject_id, section_code, year_id)
+    else:
+        lectures = await get_lectures(subject_id, section_code)
+
+    markup = build_lectures_menu(lectures)
+    lectures_map: dict[str, str] = {}
+    for item in lectures:
+        label = f"المحاضرة {arabic_ordinal(item['lecture_no'])}"
+        if item.get("title"):
+            label += f": {item['title']}"
+        lectures_map[label] = item.get("raw", "")
+    return lectures, markup, lectures_map
 
 async def render_state(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nav = NavigationState(context.user_data)
@@ -168,22 +196,21 @@ async def render_state(update: Update, context: ContextTypes.DEFAULT_TYPE):
         section_code = nav.data.get("section")
         year_id = nav.data.get("year_id")
         lecturer_id = nav.data.get("lecturer_id")
+        lectures, markup, lectures_map = await _prepare_lectures_menu(
+            subject_id, section_code, year_id=year_id, lecturer_id=lecturer_id
+        )
+        nav.data["lectures_map"] = lectures_map
 
-        titles = await list_lecture_titles(subject_id, section_code)
         heading = "اختر محاضرة:"
-
         if year_id and lecturer_id:
-            titles = await list_lecture_titles_by_lecturer_year(subject_id, section_code, lecturer_id, year_id)
             heading = "اختر محاضرة (محاضر + سنة):"
         elif lecturer_id:
-            titles = await list_lecture_titles_by_lecturer(subject_id, section_code, lecturer_id)
             heading = "اختر محاضرة (حسب المحاضر):"
         elif year_id:
-            titles = await list_lecture_titles_by_year(subject_id, section_code, year_id)
             heading = "اختر محاضرة (حسب السنة):"
 
-        msg = heading if titles else "لا توجد محاضرات مطابقة."
-        return await update.message.reply_text(msg, reply_markup=generate_lecture_titles_keyboard(titles))
+        msg = heading if lectures else "لا توجد محاضرات مطابقة."
+        return await update.message.reply_text(msg, reply_markup=markup)
 
     if top_type == "year_category_menu":
         subject_id = nav.data.get("subject_id")
@@ -193,11 +220,21 @@ async def render_state(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not year_id:
             return await render_state(update, context)
         if lecturer_id:
-            lectures_exist = bool(await list_lecture_titles_by_lecturer_year(subject_id, section_code, lecturer_id, year_id))
-            cats = await list_categories_for_subject_section_year(subject_id, section_code, year_id, lecturer_id=lecturer_id)
+            lectures_exist = bool(
+                await get_lectures_by_lecturer_year(
+                    subject_id, section_code, lecturer_id, year_id
+                )
+            )
+            cats = await list_categories_for_subject_section_year(
+                subject_id, section_code, year_id, lecturer_id=lecturer_id
+            )
         else:
-            lectures_exist = bool(await list_lecture_titles_by_year(subject_id, section_code, year_id))
-            cats = await list_categories_for_subject_section_year(subject_id, section_code, year_id)
+            lectures_exist = bool(
+                await get_lectures_by_year(subject_id, section_code, year_id)
+            )
+            cats = await list_categories_for_subject_section_year(
+                subject_id, section_code, year_id
+            )
         return await update.message.reply_text(
             "اختر نوع المحتوى:",
             reply_markup=generate_year_category_menu_keyboard(cats, lectures_exist),
@@ -402,11 +439,19 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         if text == LIST_LECTURES:
-            titles = await list_lecture_titles(subject_id, section_code)
-            if not titles:
-                return await update.message.reply_text("لا توجد محاضرات متاحة.", reply_markup=generate_subject_sections_keyboard_dynamic([]))
+            lectures, markup, lectures_map = await _prepare_lectures_menu(
+                subject_id, section_code
+            )
+            if not lectures:
+                return await update.message.reply_text(
+                    "لا توجد محاضرات متاحة.",
+                    reply_markup=generate_subject_sections_keyboard_dynamic([]),
+                )
             nav.push_view("lecture_list")
-            return await update.message.reply_text("اختر محاضرة:", reply_markup=generate_lecture_titles_keyboard(titles))
+            nav.data["lectures_map"] = lectures_map
+            return await update.message.reply_text(
+                "اختر محاضرة:", reply_markup=markup
+            )
 
     # 8.2) اختيار سنة/محاضر
     subject_id = nav.data.get("subject_id")
@@ -418,10 +463,11 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if lecturer_id and text in years_map:
             year_id = years_map[text]
             nav.set_year(text, year_id)
-            titles = await list_lecture_titles_by_lecturer_year(
-                subject_id, section_code, lecturer_id, year_id
+            lectures_exist = bool(
+                await get_lectures_by_lecturer_year(
+                    subject_id, section_code, lecturer_id, year_id
+                )
             )
-            lectures_exist = bool(titles)
             cats = await list_categories_for_subject_section_year(
                 subject_id, section_code, year_id, lecturer_id=lecturer_id
             )
@@ -434,9 +480,12 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not lecturer_id and text in years_map:
             year_id = years_map[text]
             nav.set_year(text, year_id)
-            titles = await list_lecture_titles_by_year(subject_id, section_code, year_id)
-            lectures_exist = bool(titles)
-            cats = await list_categories_for_subject_section_year(subject_id, section_code, year_id)
+            lectures_exist = bool(
+                await get_lectures_by_year(subject_id, section_code, year_id)
+            )
+            cats = await list_categories_for_subject_section_year(
+                subject_id, section_code, year_id
+            )
             nav.push_view("year_category_menu")
             return await update.message.reply_text(
                 f"السنة: {text}\nاختر نوع المحتوى:",
@@ -449,7 +498,7 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lecturer_id = lect_map[text]
             nav.set_lecturer(text, lecturer_id)
             years = await get_years_for_subject_section_lecturer(subject_id, section_code, lecturer_id)
-            lectures_exist = await list_lecture_titles_by_lecturer(subject_id, section_code, lecturer_id)
+            lectures_exist = await get_lectures_by_lecturer(subject_id, section_code, lecturer_id)
             return await update.message.reply_text(
                 f"المحاضر: {text}\nاختر خيارًا:",
                 reply_markup=generate_lecturer_filter_keyboard(bool(years), bool(lectures_exist)),
@@ -466,29 +515,40 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return await update.message.reply_text("ابدأ باختيار المادة → القسم → المحاضر.", reply_markup=main_menu)
 
         if text == CHOOSE_YEAR_FOR_LECTURER:
-            years = await get_years_for_subject_section_lecturer(subject_id, section_code, lecturer_id)
+            years = await get_years_for_subject_section_lecturer(
+                subject_id, section_code, lecturer_id
+            )
             if not years:
                 years_exist = False
-                lectures_exist = await list_lecture_titles_by_lecturer(subject_id, section_code, lecturer_id)
+                lectures_exist = await get_lectures_by_lecturer(
+                    subject_id, section_code, lecturer_id
+                )
                 return await update.message.reply_text(
                     "لا توجد سنوات مرتبطة بمحاضرات هذا المحاضر.",
-                    reply_markup=generate_lecturer_filter_keyboard(years_exist, bool(lectures_exist)),
+                    reply_markup=generate_lecturer_filter_keyboard(
+                        years_exist, bool(lectures_exist)
+                    ),
                 )
             nav.push_view("year_list")
             return await update.message.reply_text(f"المحاضر: {lecturer_label}\nاختر السنة:", reply_markup=generate_years_keyboard(years))
 
         if text == LIST_LECTURES_FOR_LECTURER:
-            titles = await list_lecture_titles_by_lecturer(subject_id, section_code, lecturer_id)
-            if not titles:
-                years = await get_years_for_subject_section_lecturer(subject_id, section_code, lecturer_id)
+            lectures, markup, lectures_map = await _prepare_lectures_menu(
+                subject_id, section_code, lecturer_id=lecturer_id
+            )
+            if not lectures:
+                years = await get_years_for_subject_section_lecturer(
+                    subject_id, section_code, lecturer_id
+                )
                 return await update.message.reply_text(
                     "لا توجد محاضرات لهذا المحاضر.",
                     reply_markup=generate_lecturer_filter_keyboard(bool(years), False),
                 )
             nav.push_view("lecture_list")
+            nav.data["lectures_map"] = lectures_map
             return await update.message.reply_text(
                 f"محاضرات الدكتور {lecturer_label}:",
-                reply_markup=generate_lecture_titles_keyboard(titles),
+                reply_markup=markup,
             )
 
 
@@ -505,11 +565,12 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # (أ) زر "📚 المحاضرات" من شاشة السنة
             if text == YEAR_MENU_LECTURES:
-                if lecturer_id and year_id:
-                    lectures = await get_lectures_by_year(subject_id, section_code, year_id)
-                else:
-                    lectures = await get_lectures_by_year(subject_id, section_code, year_id)
-
+                lectures, markup, lectures_map = await _prepare_lectures_menu(
+                    subject_id,
+                    section_code,
+                    year_id=year_id,
+                    lecturer_id=lecturer_id,
+                )
                 if not lectures:
                     cats = await list_categories_for_subject_section_year(
                         subject_id, section_code, year_id, lecturer_id=lecturer_id
@@ -520,13 +581,6 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
 
                 nav.push_view("lecture_list")
-                markup = build_lectures_menu(lectures)
-                lectures_map = {}
-                for item in lectures:
-                    label = f"المحاضرة {arabic_ordinal(item['lecture_no'])}"
-                    if item.get('title'):
-                        label += f": {item['title']}"
-                    lectures_map[label] = item.get("raw", "")
                 nav.data["lectures_map"] = lectures_map
                 return await update.message.reply_text(
                     "اختر محاضرة:", reply_markup=markup
@@ -539,12 +593,17 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # 🔒 حماية إضافية: ملف المحاضرة لا يُعرض في شاشة السنة
                 if category == "lecture":
                     # وجّه المستخدم لقائمة المحاضرات بدلًا من عرض كل "ملف المحاضرة" للسنة
-                    if lecturer_id and year_id:
-                        titles = await list_lecture_titles_by_lecturer_year(subject_id, section_code, lecturer_id, year_id)
-                    else:
-                        titles = await list_lecture_titles_by_year(subject_id, section_code, year_id)
+                    lectures, markup, lectures_map = await _prepare_lectures_menu(
+                        subject_id,
+                        section_code,
+                        year_id=year_id,
+                        lecturer_id=lecturer_id,
+                    )
                     nav.push_view("lecture_list")
-                    return await update.message.reply_text("اختر محاضرة أولًا:", reply_markup=generate_lecture_titles_keyboard(titles))
+                    nav.data["lectures_map"] = lectures_map
+                    return await update.message.reply_text(
+                        "اختر محاضرة أولًا:", reply_markup=markup
+                    )
 
                 mats = await get_materials_by_category(
                     subject_id, section_code, category,
@@ -553,9 +612,15 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not mats:
                     titles_exist = False
                     if lecturer_id and year_id:
-                        titles_exist = bool(await list_lecture_titles_by_lecturer_year(subject_id, section_code, lecturer_id, year_id))
+                        titles_exist = bool(
+                            await get_lectures_by_lecturer_year(
+                                subject_id, section_code, lecturer_id, year_id
+                            )
+                        )
                     else:
-                        titles_exist = bool(await list_lecture_titles_by_year(subject_id, section_code, year_id))
+                        titles_exist = bool(
+                            await get_lectures_by_year(subject_id, section_code, year_id)
+                        )
                     cats = await list_categories_for_subject_section_year(subject_id, section_code, year_id, lecturer_id=lecturer_id)
                     return await update.message.reply_text("لا توجد ملفات لهذا التصنيف.", reply_markup=generate_year_category_menu_keyboard(cats, titles_exist))
 
@@ -590,11 +655,22 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 titles_exist = False
                 if lecturer_id and year_id:
-                    titles_exist = bool(await list_lecture_titles_by_lecturer_year(subject_id, section_code, lecturer_id, year_id))
+                    titles_exist = bool(
+                        await get_lectures_by_lecturer_year(
+                            subject_id, section_code, lecturer_id, year_id
+                        )
+                    )
                 else:
-                    titles_exist = bool(await list_lecture_titles_by_year(subject_id, section_code, year_id))
-                cats = await list_categories_for_subject_section_year(subject_id, section_code, year_id, lecturer_id=lecturer_id)
-                return await update.message.reply_text("اختر نوع محتوى آخر:", reply_markup=generate_year_category_menu_keyboard(cats, titles_exist))
+                    titles_exist = bool(
+                        await get_lectures_by_year(subject_id, section_code, year_id)
+                    )
+                cats = await list_categories_for_subject_section_year(
+                    subject_id, section_code, year_id, lecturer_id=lecturer_id
+                )
+                return await update.message.reply_text(
+                    "اختر نوع محتوى آخر:",
+                    reply_markup=generate_year_category_menu_keyboard(cats, titles_exist),
+                )
 
 
 
@@ -651,26 +727,24 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         elif url:
                             await update.message.reply_text(f"📄 {title}\n{url}")
                     nav.back_one()
-                    lectures = await get_lectures_by_year(subject_id, section_code, year_id)
-                    markup = build_lectures_menu(lectures)
-                    new_map = {}
-                    for item in lectures:
-                        label = f"المحاضرة {arabic_ordinal(item['lecture_no'])}"
-                        if item.get('title'):
-                            label += f": {item['title']}"
-                        new_map[label] = item.get("raw", "")
+                    lectures, markup, new_map = await _prepare_lectures_menu(
+                        subject_id,
+                        section_code,
+                        year_id=year_id,
+                        lecturer_id=lecturer_id,
+                    )
                     nav.data["lectures_map"] = new_map
-                    return await update.message.reply_text("اختر محاضرة أخرى:", reply_markup=markup)
+                    return await update.message.reply_text(
+                        "اختر محاضرة أخرى:", reply_markup=markup
+                    )
 
                 nav.back_one()
-                lectures = await get_lectures_by_year(subject_id, section_code, year_id)
-                markup = build_lectures_menu(lectures)
-                new_map = {}
-                for item in lectures:
-                    label = f"المحاضرة {arabic_ordinal(item['lecture_no'])}"
-                    if item.get('title'):
-                        label += f": {item['title']}"
-                    new_map[label] = item.get("raw", "")
+                lectures, markup, new_map = await _prepare_lectures_menu(
+                    subject_id,
+                    section_code,
+                    year_id=year_id,
+                    lecturer_id=lecturer_id,
+                )
                 nav.data["lectures_map"] = new_map
                 return await update.message.reply_text(
                     "لا توجد أنواع ملفات لهذه المحاضرة.", reply_markup=markup
