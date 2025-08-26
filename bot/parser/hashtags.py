@@ -51,6 +51,7 @@ CONTENT_TYPE_ALIASES = {
     "audio": "audio",
     "video": "video",
     "board_images": "board_images",
+    "lecture": "lecture",
 }
 
 LECTURER_PREFIXES: Tuple[str, ...] = (
@@ -179,15 +180,21 @@ def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
         return info, msg
 
     ct = info.content_type
-    if ct in {"daily_brief", "board_images"}:
+    if ct in {"daily_brief", "board_images", "lecture"}:
         expected = ["content", "lecture", "year"]
+        if ct == "lecture":
+            content_tag = "#lecture"
+        elif ct == "daily_brief":
+            content_tag = "#موجز_يومي"
+        else:
+            content_tag = "#صور_السبورة"
         if sequence[:3] != expected:
             return _err(
-                "رجاءً اتّبع ترتيب الوسوم لهذا النوع: #موجز_يومي\n#المحاضرة_1: العنوان\n#1446"
+                f"رجاءً اتّبع ترتيب الوسوم لهذا النوع: {content_tag}\n#المحاضرة_1: العنوان\n#1446"
             )
         if len(sequence) > 4 or (len(sequence) == 4 and sequence[3] != "lecturer"):
             return _err(
-                "رجاءً اتّبع ترتيب الوسوم لهذا النوع: #موجز_يومي\n#المحاضرة_1: العنوان\n#1446\n#الدكتور_اسم (اختياري)"
+                f"رجاءً اتّبع ترتيب الوسوم لهذا النوع: {content_tag}\n#المحاضرة_1: العنوان\n#1446\n#الدكتور_اسم (اختياري)"
             )
         if not info.lecture_no or not info.title:
             return _err("هذا النوع يتطلب وسم محاضرة بصيغة: #المحاضرة_1: <العنوان>")
