@@ -464,12 +464,16 @@ async def get_lectures(subject_id: int, section: str) -> list[dict]:
     return _titles_to_lectures(titles)
 
 
-async def get_lectures_by_lecturer(
+async def get_lectures_for_lecturer(
     subject_id: int, section: str, lecturer_id: int
 ) -> list[dict]:
-    """Return lectures filtered by *lecturer_id*."""
+    """Return lectures for a specific *lecturer_id* with numbers extracted."""
     titles = await list_lecture_titles_by_lecturer(subject_id, section, lecturer_id)
     return _titles_to_lectures(titles)
+
+
+# Backwards compatibility alias
+get_lectures_by_lecturer = get_lectures_for_lecturer
 
 
 async def get_lectures_by_lecturer_year(
