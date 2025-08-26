@@ -159,6 +159,36 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         created_by_admin_id=admin_id,
     )
 
+    lecture_attachment_categories = [
+        "board_images",
+        "slides",
+        "audio",
+        "video",
+        "mind_map",
+        "transcript",
+        "related",
+    ]
+    if category in lecture_attachment_categories:
+        lecture_title = f"محاضرة {info.lecture_no}: {info.title}"
+        lecture = await find_exact(
+            subject_id,
+            section,
+            "lecture",
+            lecture_title,
+            year_id=year_id,
+            lecturer_id=lecturer_id,
+        )
+        if not lecture:
+            await insert_material(
+                subject_id,
+                section,
+                "lecture",
+                lecture_title,
+                year_id=year_id,
+                lecturer_id=lecturer_id,
+                created_by_admin_id=admin_id,
+            )
+
     ingestion_id = await insert_ingestion(
         message.message_id, admin_id, file_unique_id=file_unique_id
     )
