@@ -17,7 +17,7 @@ from .constants import (
     LIST_LECTURES_FOR_LECTURER,
 )
 
-from ..utils.formatting import arabic_ordinal, to_display_name
+from ..utils.formatting import arabic_ordinal, format_lecturer_name
 
 
 def _rows(items: list[str], cols: int = 2) -> list[list[str]]:
@@ -145,7 +145,7 @@ def generate_years_keyboard(years: list[tuple[int, str]]) -> ReplyKeyboardMarkup
 
 def generate_lecturers_keyboard(lecturers: list[tuple[int, str]]) -> ReplyKeyboardMarkup:
     """Display lecturers for the subject/section."""
-    names = [to_display_name(name) for _id, name in lecturers]
+    names = [format_lecturer_name(name) for _id, name in lecturers]
     keyboard = _rows(names, cols=2)
     keyboard.append([BACK, BACK_TO_SUBJECTS])
     keyboard.append([BACK_TO_LEVELS])
