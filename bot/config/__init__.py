@@ -1,36 +1,28 @@
-"""Load configuration values from environment variables."""
+"""Configuration facade: provides `config` object and back-compat globals."""
 
-import os
-from datetime import datetime
-from dotenv import load_dotenv
+from .config import Config
+from .constants import ENV_FILE  # re-export if someone needs it
 
-from .constants import ENV_FILE
+# Build a singleton config instance
+config = Config.from_env()
 
+# --- Backward compatibility exports (minimize breaking changes) ---
+BOT_TOKEN = config.BOT_TOKEN
+ARCHIVE_CHANNEL_ID = config.ARCHIVE_CHANNEL_ID
+GROUP_ID = config.GROUP_ID
+OWNER_TG_ID = config.OWNER_TG_ID
+ADMIN_USER_IDS = config.ADMIN_USER_IDS
+VERSION = config.VERSION
+START_TIME = config.START_TIME
 
-load_dotenv(ENV_FILE)
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN is missing in .env")
-
-
-def _to_int(env_key: str) -> int | None:
-    val = os.getenv(env_key)
-    return int(val) if val and val.strip() else None
-
-
-ARCHIVE_CHANNEL_ID = _to_int("ARCHIVE_CHANNEL_ID")
-if ARCHIVE_CHANNEL_ID is None:
-    raise RuntimeError("ARCHIVE_CHANNEL_ID is missing in .env")
-GROUP_ID = _to_int("GROUP_ID")
-
-OWNER_TG_ID = _to_int("OWNER_TG_ID")
-if OWNER_TG_ID is None:
-    raise RuntimeError("OWNER_TG_ID is missing in .env")
-
-_admin = os.getenv("ADMIN_USER_IDS", "")
-ADMIN_USER_IDS = [int(x) for x in _admin.split(",") if x.strip().isdigit()]
-
-VERSION = os.getenv("COMMIT_SHA", "dev")
-START_TIME = datetime.now()
-
+__all__ = [
+    "config",
+    "ENV_FILE",
+    "BOT_TOKEN",
+    "ARCHIVE_CHANNEL_ID",
+    "GROUP_ID",
+    "OWNER_TG_ID",
+    "ADMIN_USER_IDS",
+    "VERSION",
+    "START_TIME",
+]
