@@ -34,6 +34,7 @@ from ..keyboards.constants import (
     TERM_MENU_LINKS,
     TERM_MENU_ADV_SEARCH,
     LABEL_TO_SECTION,
+    SECTION_LABELS,
     BACK_TO_LEVELS,
     BACK_TO_SUBJECTS,
     FILTER_BY_YEAR,
@@ -379,6 +380,21 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return await update.message.reply_text("تعذر العثور على المادة.", reply_markup=generate_term_menu_keyboard_dynamic(flags))
             nav.set_subject(text, subject_id)
             sections = await get_available_sections_for_subject(subject_id)
+            if len(sections) == 1:
+                section_code = sections[0]
+                section_label = SECTION_LABELS.get(section_code, section_code)
+                nav.set_section(section_label, section_code)
+
+                years = await get_years_for_subject_section(subject_id, section_code)
+                lecturers = await get_lecturers_for_subject_section(subject_id, section_code)
+                lectures_exist = await has_lecture_category(subject_id, section_code)
+
+                return await update.message.reply_text(
+                    "اختر طريقة التصفية:",
+                    reply_markup=generate_section_filters_keyboard_dynamic(
+                        bool(years), bool(lecturers), lectures_exist
+                    ),
+                )
             return await update.message.reply_text(
                 f"المادة: {text}\nاختر القسم:" if sections else "لا توجد أقسام متاحة لهذه المادة حتى الآن.",
                 reply_markup=generate_subject_sections_keyboard_dynamic(sections),
