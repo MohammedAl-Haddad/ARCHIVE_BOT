@@ -30,7 +30,11 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     info, error = parse_hashtags(text)
     if error:
         await send_ephemeral(
-            context, message.chat_id, error, reply_to_message_id=message.message_id
+            context,
+            message.chat_id,
+            error,
+            reply_to_message_id=message.message_id,
+            message_thread_id=message.message_thread_id,
         )
         return
 
@@ -63,6 +67,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 message.chat_id,
                 "لا يمكن تحديد المستخدم.",
                 reply_to_message_id=message.message_id,
+                message_thread_id=message.message_thread_id,
             )
         return
 
@@ -74,6 +79,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message.chat_id,
             "المستخدم ليس مشرفًا.",
             reply_to_message_id=message.message_id,
+            message_thread_id=message.message_thread_id,
         )
         return
     admin_id, permissions = admin_info
@@ -84,6 +90,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message.chat_id,
             "لا تملك صلاحية رفع المحتوى.",
             reply_to_message_id=message.message_id,
+            message_thread_id=message.message_thread_id,
         )
         return
 
@@ -97,6 +104,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 message.chat_id,
                 "لا يمكن تحديد المحادثة.",
                 reply_to_message_id=message.message_id,
+                message_thread_id=message.message_thread_id,
             )
         return
 
@@ -109,6 +117,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message.chat_id,
             "المجموعة غير معروفة.",
             reply_to_message_id=message.message_id,
+            message_thread_id=message.message_thread_id,
         )
         return
     binding = None
@@ -119,6 +128,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 message.chat_id,
                 "هذا النوع يتطلب ربط الـTopic بمادة/قسم عبر /insert_sub.",
                 reply_to_message_id=message.message_id,
+                message_thread_id=message.message_thread_id,
             )
             return
         binding = await get_binding(chat.id, thread_id)
@@ -129,6 +139,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 message.chat_id,
                 "هذا النوع يتطلب ربط الـTopic بمادة/قسم عبر /insert_sub.",
                 reply_to_message_id=message.message_id,
+                message_thread_id=message.message_thread_id,
             )
             return
         subject_id = binding["subject_id"]
@@ -143,6 +154,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message.chat_id,
             "لم يتم التعرف على نوع المحتوى.",
             reply_to_message_id=message.message_id,
+            message_thread_id=message.message_thread_id,
         )
         return
 
@@ -154,6 +166,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat.id,
             "✅ تم الاستلام.",
             reply_to_message_id=message.message_id,
+            message_thread_id=thread_id,
         )
         return
 
@@ -178,6 +191,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         ctx[message.message_id] = {
             "old_material_id": existing[0],
             "chat_id": chat.id,
+            "thread_id": thread_id,
             "admin_id": admin_id,
             "subject_name": subject_name,
             "section": section,
@@ -251,6 +265,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         chat.id,
         f"✅ تم الاستلام. رقم العملية: #{ingestion_id}\nسيتم إشعارك بعد المراجعة.",
         reply_to_message_id=message.message_id,
+        message_thread_id=thread_id,
     )
     logger.info(
         "pending #%s subject=%s section=%s year=%s type=%s title=%s",
@@ -297,7 +312,10 @@ async def handle_duplicate_decision(
         return
     if query.from_user.id != data["admin_id"]:
         await send_ephemeral(
-            context, query.message.chat_id, "العملية مخصّصة لمرسل الملف"
+            context,
+            query.message.chat_id,
+            "العملية مخصّصة لمرسل الملف",
+            message_thread_id=query.message.message_thread_id,
         )
         return
     try:
@@ -306,7 +324,12 @@ async def handle_duplicate_decision(
         await query.edit_message_reply_markup(None)
     if action == "cancel":
         ctx.pop(msg_id, None)
-        await send_ephemeral(context, query.message.chat_id, "تم الإلغاء.")
+        await send_ephemeral(
+            context,
+            query.message.chat_id,
+            "تم الإلغاء.",
+            message_thread_id=query.message.message_thread_id,
+        )
         buttons = [
             [
                 InlineKeyboardButton(
@@ -321,6 +344,7 @@ async def handle_duplicate_decision(
             chat_id=query.message.chat_id,
             text="ماذا تريد أن تفعل بالرسالة الأصلية؟",
             reply_markup=InlineKeyboardMarkup(buttons),
+            message_thread_id=query.message.message_thread_id,
         )
         return
     old_material_id = data["old_material_id"]
@@ -334,6 +358,7 @@ async def handle_duplicate_decision(
         data["chat_id"],
         f"✅ تم الاستلام. رقم العملية: #{ingestion_id}\nسيتم إشعارك بعد المراجعة.",
         reply_to_message_id=msg_id,
+        message_thread_id=data.get("thread_id"),
     )
     summary = (
         "طلب استبدال ملف مرفوع سابقًا\n"

@@ -52,13 +52,17 @@ async def send_ephemeral(
     text: str,
     seconds: int = 10,
     reply_to_message_id: int | None = None,
+    message_thread_id: int | None = None,
 ):
     """Send a message that auto-deletes after ``seconds`` seconds.
 
     The bot must possess the ``Delete messages`` right in group chats.
     """
     msg = await context.bot.send_message(
-        chat_id, text, reply_to_message_id=reply_to_message_id
+        chat_id,
+        text,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
     )
 
     async def delete_later() -> None:
