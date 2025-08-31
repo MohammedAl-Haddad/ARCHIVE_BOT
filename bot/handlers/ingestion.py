@@ -295,6 +295,11 @@ async def handle_duplicate_decision(
     if data is None:
         await query.edit_message_text("انتهت صلاحية الطلب.")
         return
+    if query.from_user.id != data["admin_id"]:
+        await send_ephemeral(
+            context, query.message.chat_id, "العملية مخصّصة لمرسل الملف"
+        )
+        return
     if action == "cancel":
         ctx.pop(msg_id, None)
         await send_ephemeral(context, query.message.chat_id, "تم الإلغاء.")
