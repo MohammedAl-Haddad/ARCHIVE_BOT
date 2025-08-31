@@ -307,6 +307,21 @@ async def handle_duplicate_decision(
     if action == "cancel":
         ctx.pop(msg_id, None)
         await send_ephemeral(context, query.message.chat_id, "تم الإلغاء.")
+        buttons = [
+            [
+                InlineKeyboardButton(
+                    "إبقاء الرسالة", callback_data=f"dup:keep:{msg_id}"
+                ),
+                InlineKeyboardButton(
+                    "حذف الرسالة", callback_data=f"dup:del:{msg_id}"
+                ),
+            ]
+        ]
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="ماذا تريد أن تفعل بالرسالة الأصلية؟",
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
         return
     old_material_id = data["old_material_id"]
     admin_id = data["admin_id"]
@@ -346,10 +361,34 @@ async def handle_duplicate_decision(
     ctx.pop(msg_id, None)
 
 
+async def handle_duplicate_cancel_choice(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    query = update.callback_query
+    await query.answer()
+    _, action, msg_id = query.data.split(":")
+    msg_id = int(msg_id)
+    if action == "del":
+        try:
+            await context.bot.delete_message(
+                chat_id=query.message.chat_id, message_id=msg_id
+            )
+        except Exception:
+            pass
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+
+
 duplicate_callback = CallbackQueryHandler(
     handle_duplicate_decision, pattern=r"^dup:(rep|cancel):"
 )
 
+duplicate_cancel_callback = CallbackQueryHandler(
+    handle_duplicate_cancel_choice, pattern=r"^dup:(keep|del):"
+)
 
-__all__ = ["ingestion_handler", "duplicate_callback"]
+
+__all__ = ["ingestion_handler", "duplicate_callback", "duplicate_cancel_callback"]
 
