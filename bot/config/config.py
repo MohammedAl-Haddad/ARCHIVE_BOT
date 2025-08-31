@@ -21,6 +21,7 @@ class Config:
     ADMIN_USER_IDS: List[int]
     VERSION: str
     START_TIME: datetime
+    PER_PAGE: int
 
     @staticmethod
     def _to_int(key: str, *, required: bool = False) -> Optional[int]:
@@ -53,6 +54,7 @@ class Config:
 
         version = os.getenv("COMMIT_SHA", "dev")
         start_time = datetime.now()
+        per_page = cls._to_int("PER_PAGE", required=False) or 8
 
         return cls(
             BOT_TOKEN=bot_token,
@@ -62,4 +64,5 @@ class Config:
             ADMIN_USER_IDS=admin_user_ids,
             VERSION=version,
             START_TIME=start_time,
+            PER_PAGE=per_page,
         )

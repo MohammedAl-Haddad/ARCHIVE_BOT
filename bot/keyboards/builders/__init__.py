@@ -1,6 +1,6 @@
 from telegram import ReplyKeyboardMarkup
 
-from .constants import (
+from ..constants import (
     TERM_MENU_SHOW_SUBJECTS,
     TERM_MENU_PLAN,
     TERM_MENU_LINKS,
@@ -17,7 +17,7 @@ from .constants import (
     LIST_LECTURES_FOR_LECTURER,
 )
 
-from ..utils.formatting import arabic_ordinal, format_lecturer_name
+from ...utils.formatting import arabic_ordinal, format_lecturer_name
 
 
 def _rows(items: list[str], cols: int = 2) -> list[list[str]]:
@@ -267,3 +267,7 @@ __all__ = [
     "build_types_menu",
     "build_exam_menu",
 ]
+
+from .paginated import build_children_keyboard
+
+__all__ += ["build_children_keyboard"]
