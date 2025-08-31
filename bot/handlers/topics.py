@@ -189,10 +189,20 @@ async def insert_sub_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE)
             info["section"],
         )
         await conv_cleanup(context, context.bot, chat.id)
-        await send_ephemeral(context, chat.id, "تم الربط بنجاح.")
+        await send_ephemeral(
+            context,
+            chat.id,
+            "تم الربط بنجاح.",
+            message_thread_id=info.get("thread_id"),
+        )
     else:
         await conv_cleanup(context, context.bot, chat.id)
-        await send_ephemeral(context, chat.id, "تم الإلغاء.")
+        await send_ephemeral(
+            context,
+            chat.id,
+            "تم الإلغاء.",
+            message_thread_id=info.get("thread_id"),
+        )
     context.chat_data.pop("insert_sub", None)
     return ConversationHandler.END
 

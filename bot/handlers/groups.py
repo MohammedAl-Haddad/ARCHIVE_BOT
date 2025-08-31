@@ -120,10 +120,20 @@ async def insert_group_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
             info["term_id"],
         )
         await conv_cleanup(context, context.bot, update.effective_chat.id)
-        await send_ephemeral(context, update.effective_chat.id, "تم الربط بنجاح.")
+        await send_ephemeral(
+            context,
+            update.effective_chat.id,
+            "تم الربط بنجاح.",
+            message_thread_id=query.message.message_thread_id,
+        )
     else:
         await conv_cleanup(context, context.bot, update.effective_chat.id)
-        await send_ephemeral(context, update.effective_chat.id, "تم الإلغاء.")
+        await send_ephemeral(
+            context,
+            update.effective_chat.id,
+            "تم الإلغاء.",
+            message_thread_id=query.message.message_thread_id,
+        )
     context.chat_data.pop("insert_group", None)
     return ConversationHandler.END
 
