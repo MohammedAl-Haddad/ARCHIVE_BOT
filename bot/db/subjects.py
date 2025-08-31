@@ -8,9 +8,18 @@ from .base import DB_PATH
 # Basic reads for levels/terms/subjects
 # -----------------------------------------------------------------------------
 async def get_levels():
-    """Return list of levels as [(id, name), ...] ordered by id."""
+    """Return levels that have available materials."""
     async with aiosqlite.connect(DB_PATH) as db:
-        cur = await db.execute("SELECT id, name FROM levels ORDER BY id")
+        cur = await db.execute(
+            """
+            SELECT DISTINCT l.id, l.name
+            FROM levels l
+            JOIN subjects s ON s.level_id = l.id
+            JOIN materials m ON m.subject_id = s.id
+            WHERE m.url IS NOT NULL OR m.tg_storage_msg_id IS NOT NULL
+            ORDER BY l.id
+            """
+        )
         return await cur.fetchall()
 
 
@@ -136,14 +145,16 @@ async def set_theory_only(subject_id: int, value: bool) -> None:
 # Queries for navigation
 # -----------------------------------------------------------------------------
 async def get_terms_by_level(level_id: int):
-    """Return terms available for a level: [(term_id, term_name), ...]."""
+    """Return terms with materials for a level: [(term_id, term_name), ...]."""
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             """
             SELECT DISTINCT t.id, t.name
             FROM terms t
             JOIN subjects s ON s.term_id = t.id
+            JOIN materials m ON m.subject_id = s.id
             WHERE s.level_id = ?
+              AND (m.url IS NOT NULL OR m.tg_storage_msg_id IS NOT NULL)
             ORDER BY t.id
             """,
             (level_id,),
@@ -152,10 +163,17 @@ async def get_terms_by_level(level_id: int):
 
 
 async def get_subjects_by_level_and_term(level_id: int, term_id: int):
-    """Return subject names for level/term as [(name,), ...]."""
+    """Return subject names that have materials for level/term as [(name,), ...]."""
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "SELECT name FROM subjects WHERE level_id = ? AND term_id = ? ORDER BY id",
+            """
+            SELECT DISTINCT s.name
+            FROM subjects s
+            JOIN materials m ON m.subject_id = s.id
+            WHERE s.level_id = ? AND s.term_id = ?
+              AND (m.url IS NOT NULL OR m.tg_storage_msg_id IS NOT NULL)
+            ORDER BY s.id
+            """,
             (level_id, term_id),
         )
         return await cur.fetchall()
@@ -176,10 +194,16 @@ async def get_subject_id_by_name(level_id: int, term_id: int, subject_name: str)
 # Dynamic helpers
 # -----------------------------------------------------------------------------
 async def count_subjects(level_id: int, term_id: int) -> int:
-    """Return number of subjects for the specified level and term."""
+    """Return number of subjects with materials for the specified level and term."""
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "SELECT COUNT(*) FROM subjects WHERE level_id=? AND term_id=?",
+            """
+            SELECT COUNT(DISTINCT s.id)
+            FROM subjects s
+            JOIN materials m ON m.subject_id = s.id
+            WHERE s.level_id=? AND s.term_id=?
+              AND (m.url IS NOT NULL OR m.tg_storage_msg_id IS NOT NULL)
+            """,
             (level_id, term_id),
         )
         (n,) = await cur.fetchone()
@@ -196,6 +220,7 @@ async def term_feature_flags(level_id: int, term_id: int) -> dict:
             FROM materials m
             JOIN subjects s ON s.id = m.subject_id
             WHERE s.level_id=? AND s.term_id=? AND m.section='syllabus'
+              AND (m.url IS NOT NULL OR m.tg_storage_msg_id IS NOT NULL)
             LIMIT 1
             """,
             (level_id, term_id),
@@ -209,6 +234,7 @@ async def term_feature_flags(level_id: int, term_id: int) -> dict:
             FROM materials m
             JOIN subjects s ON s.id = m.subject_id
             WHERE s.level_id=? AND s.term_id=? AND m.category='external_link'
+              AND (m.url IS NOT NULL OR m.tg_storage_msg_id IS NOT NULL)
             LIMIT 1
             """,
             (level_id, term_id),
@@ -224,7 +250,11 @@ async def get_available_sections_for_subject(subject_id: int) -> list[str]:
     """Return distinct sections available for a subject from materials."""
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
-            "SELECT DISTINCT section FROM materials WHERE subject_id=?",
+            """
+            SELECT DISTINCT section
+            FROM materials
+            WHERE subject_id=? AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
+            """,
             (subject_id,),
         )
         rows = await cur.fetchall()

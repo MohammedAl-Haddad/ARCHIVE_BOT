@@ -52,6 +52,19 @@ async def bind(tg_chat_id: int, tg_topic_id: int, subject_id: int, section: str)
             (group_id, tg_topic_id, subject_id, section),
         )
         await db.commit()
+    await cleanup_orphan_topics()
 
 
-__all__ = ["get_group_id_by_chat", "get_binding", "bind"]
+async def cleanup_orphan_topics() -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            DELETE FROM topics
+            WHERE group_id NOT IN (SELECT id FROM groups)
+               OR subject_id NOT IN (SELECT id FROM subjects)
+            """
+        )
+        await db.commit()
+
+
+__all__ = ["get_group_id_by_chat", "get_binding", "bind", "cleanup_orphan_topics"]

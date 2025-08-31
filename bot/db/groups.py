@@ -2,7 +2,6 @@ import aiosqlite
 
 from .base import DB_PATH
 
-
 async def get_group_info(tg_chat_id: int) -> tuple[int, int] | None:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
@@ -27,6 +26,18 @@ async def upsert_group(tg_chat_id: int, level_id: int, term_id: int, title: str)
             (tg_chat_id, title, level_id, term_id),
         )
         await db.commit()
+    await cleanup_unused_levels_terms()
 
 
-__all__ = ["get_group_info", "upsert_group"]
+async def cleanup_unused_levels_terms() -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM levels WHERE id NOT IN (SELECT DISTINCT level_id FROM groups)"
+        )
+        await db.execute(
+            "DELETE FROM terms WHERE id NOT IN (SELECT DISTINCT term_id FROM groups)"
+        )
+        await db.commit()
+
+
+__all__ = ["get_group_info", "upsert_group", "cleanup_unused_levels_terms"]
