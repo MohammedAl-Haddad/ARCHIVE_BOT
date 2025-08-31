@@ -22,6 +22,8 @@ class Config:
     VERSION: str
     START_TIME: datetime
     PER_PAGE: int
+    NAV_TREE_ENABLED: bool
+    NAV_TREE_SHADOW: bool
 
     @staticmethod
     def _to_int(key: str, *, required: bool = False) -> Optional[int]:
@@ -34,6 +36,11 @@ class Config:
             return int(str(val).strip())
         except ValueError as e:
             raise RuntimeError(f"{key} must be an integer, got: {val!r}") from e
+
+    @staticmethod
+    def _to_bool(key: str) -> bool:
+        val = os.getenv(key, "").strip().lower()
+        return val in {"1", "true", "yes", "on"}
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -55,6 +62,8 @@ class Config:
         version = os.getenv("COMMIT_SHA", "dev")
         start_time = datetime.now()
         per_page = cls._to_int("PER_PAGE", required=False) or 8
+        nav_tree_enabled = cls._to_bool("NAV_TREE_ENABLED")
+        nav_tree_shadow = cls._to_bool("NAV_TREE_SHADOW")
 
         return cls(
             BOT_TOKEN=bot_token,
@@ -65,4 +74,6 @@ class Config:
             VERSION=version,
             START_TIME=start_time,
             PER_PAGE=per_page,
+            NAV_TREE_ENABLED=nav_tree_enabled,
+            NAV_TREE_SHADOW=nav_tree_shadow,
         )
