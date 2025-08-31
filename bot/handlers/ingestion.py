@@ -16,6 +16,7 @@ from ..db import (
     insert_term_resource,
 )
 from ..db.materials import insert_material, find_exact
+from bot.db.admins import is_owner
 from ..parser.hashtags import parse_hashtags
 from ..utils.telegram import send_ephemeral, get_file_unique_id_from_message
 
@@ -193,6 +194,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "chat_id": chat.id,
             "thread_id": thread_id,
             "admin_id": admin_id,
+            "tg_user_id": user.id,
             "subject_name": subject_name,
             "section": section,
             "category": category,
@@ -310,7 +312,7 @@ async def handle_duplicate_decision(
     if data is None:
         await query.edit_message_text("انتهت صلاحية الطلب.")
         return
-    if query.from_user.id != data["admin_id"]:
+    if query.from_user.id != data["tg_user_id"] and not is_owner(query.from_user.id):
         await send_ephemeral(
             context,
             query.message.chat_id,
