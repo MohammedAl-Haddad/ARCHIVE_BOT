@@ -12,7 +12,6 @@ from bot.db import (
     get_lecturers_for_subject_section,
     has_lecture_category,
     get_years_for_subject_section_lecturer,
-    list_lecture_titles_by_year,
     get_subject_id_by_name,
     get_materials_by_category,
     get_lecture_materials,
@@ -56,7 +55,6 @@ from ..keyboards.builders import (
     generate_section_filters_keyboard_dynamic,
     generate_years_keyboard,
     generate_lecturers_keyboard,
-    generate_lecture_titles_keyboard,
     generate_year_category_menu_keyboard,
     generate_lecture_category_menu_keyboard,
     build_years_menu,
@@ -158,9 +156,16 @@ async def render_state(update: Update, context: ContextTypes.DEFAULT_TYPE):
         section_code = nav.data.get("section")
         year_label = stack[-1][1]
         year_id = nav.data.get("year_id")
-        titles = await list_lecture_titles_by_year(subject_id, section_code, year_id)
-        msg = f"السنة: {year_label}\nاختر محاضرة:" if titles else "لا توجد محاضرات لهذه السنة."
-        return await update.message.reply_text(msg, reply_markup=generate_lecture_titles_keyboard(titles))
+        lectures, markup, lectures_map = await _prepare_lectures_menu(
+            subject_id, section_code, year_id=year_id
+        )
+        nav.data["lectures_map"] = lectures_map
+        msg = (
+            f"السنة: {year_label}\nاختر محاضرة:"
+            if lectures
+            else "لا توجد محاضرات لهذه السنة."
+        )
+        return await update.message.reply_text(msg, reply_markup=markup)
 
     if top_type == "lecturer":
         subject_id = nav.data.get("subject_id")

@@ -4,6 +4,11 @@ import re
 from .base import DB_PATH
 
 
+def _strip_lecture_prefix(title: str) -> str:
+    """Return title without the "محاضرة N:" prefix if present."""
+    return title.split(":", 1)[1].strip() if ":" in title else title
+
+
 async def ensure_file_unique_id_column() -> None:
     """Ensure the ``file_unique_id`` column exists on ``materials`` table."""
     async with aiosqlite.connect(DB_PATH) as db:
@@ -168,13 +173,25 @@ async def find_exact(
     *,
     year_id: int | None = None,
     lecturer_id: int | None = None,
+    alt_title: str | None = None,
 ) -> tuple[int] | None:
-    """Return material id matching all provided attributes exactly."""
-    q = (
-        "SELECT id FROM materials WHERE subject_id=? AND section=? "
-        "AND category=? AND title=?"
-    )
-    params: list = [subject_id, section, category, title]
+    """Return material id matching all provided attributes exactly.
+
+    ``alt_title`` allows matching legacy records that stored the lecture title
+    without the "محاضرة N:" prefix.
+    """
+    if alt_title and alt_title != title:
+        q = (
+            "SELECT id FROM materials WHERE subject_id=? AND section=? "
+            "AND category=? AND title IN (?, ?)"
+        )
+        params: list = [subject_id, section, category, title, alt_title]
+    else:
+        q = (
+            "SELECT id FROM materials WHERE subject_id=? AND section=? "
+            "AND category=? AND title=?"
+        )
+        params = [subject_id, section, category, title]
     if year_id is None:
         q += " AND year_id IS NULL"
     else:
@@ -340,8 +357,13 @@ async def get_lecture_materials(
         q += " AND lecturer_id=?"
         params.append(lecturer_id)
     if title is not None:
-        q += " AND title=?"
-        params.append(title)
+        plain = _strip_lecture_prefix(title)
+        if plain and plain != title:
+            q += " AND title IN (?, ?)"
+            params.extend([title, plain])
+        else:
+            q += " AND title=?"
+            params.append(title)
     q += " ORDER BY id"
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -357,6 +379,7 @@ async def get_materials_by_category(
     year_id: int | None = None,
     lecturer_id: int | None = None,
     title: str | None = None,
+    alt_title: str | None = None,
 ):
     q = """
         SELECT id, title, url, tg_storage_chat_id, tg_storage_msg_id
@@ -372,8 +395,12 @@ async def get_materials_by_category(
         q += " AND lecturer_id=?"
         params.append(lecturer_id)
     if title is not None:
-        q += " AND title=?"
-        params.append(title)
+        if alt_title and alt_title != title:
+            q += " AND title IN (?, ?)"
+            params.extend([title, alt_title])
+        else:
+            q += " AND title=?"
+            params.append(title)
     q += " ORDER BY id"
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -424,13 +451,23 @@ async def list_categories_for_lecture(
     year_id: int | None = None,
     lecturer_id: int | None = None,
 ) -> list[str]:
-    q = """
-        SELECT DISTINCT category
-        FROM materials
-        WHERE subject_id=? AND section=? AND title=? AND category IS NOT NULL
-          AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
-    """
-    params = [subject_id, section, title]
+    plain = _strip_lecture_prefix(title)
+    if plain != title:
+        q = """
+            SELECT DISTINCT category
+            FROM materials
+            WHERE subject_id=? AND section=? AND title IN (?, ?) AND category IS NOT NULL
+              AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
+        """
+        params = [subject_id, section, title, plain]
+    else:
+        q = """
+            SELECT DISTINCT category
+            FROM materials
+            WHERE subject_id=? AND section=? AND title=? AND category IS NOT NULL
+              AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
+        """
+        params = [subject_id, section, title]
     if year_id is not None:
         q += " AND year_id=?"
         params.append(year_id)
@@ -459,7 +496,7 @@ def _titles_to_lectures(titles: list[str]) -> list[dict]:
     for t in titles:
         m = re.search(r"(\d+)", t)
         no = int(m.group(1)) if m else len(lectures) + 1
-        title = t.split(":", 1)[1].strip() if ":" in t else ""
+        title = t.split(":", 1)[1].strip() if ":" in t else t
         lectures.append({"lecture_no": no, "title": title, "raw": t})
     return lectures
 
@@ -505,11 +542,19 @@ async def get_types_for_lecture(
     lecture_title: str,
 ) -> dict[str, tuple[int, str | None, int | None, int | None]]:
     """Return available types for a lecture mapped to material records."""
-    cats = await list_categories_for_lecture(subject_id, section, lecture_title, year_id=year_id)
+    plain = _strip_lecture_prefix(lecture_title)
+    cats = await list_categories_for_lecture(
+        subject_id, section, lecture_title, year_id=year_id
+    )
     result: dict[str, tuple[int, str | None, int | None, int | None]] = {}
     for cat in cats:
         mats = await get_materials_by_category(
-            subject_id, section, cat, year_id=year_id, title=lecture_title
+            subject_id,
+            section,
+            cat,
+            year_id=year_id,
+            title=lecture_title,
+            alt_title=plain if plain != lecture_title else None,
         )
         if mats:
             _id, title, url, chat_id, msg_id = mats[0]

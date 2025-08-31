@@ -37,6 +37,21 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     title = info.title or ""
     lecturer_name = info.lecturer
 
+    lecture_attachment_categories = [
+        "board_images",
+        "slides",
+        "audio",
+        "video",
+        "mind_map",
+        "transcript",
+        "related",
+    ]
+
+    if category == "lecture" or category in lecture_attachment_categories:
+        lecture_title = f"محاضرة {info.lecture_no}: {info.title}"
+    else:
+        lecture_title = title
+
     user = update.effective_user
     if not user:
         logger.warning("No effective user on update")
@@ -104,13 +119,16 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await get_or_create_lecturer(lecturer_name) if lecturer_name else None
     )
 
+    lookup_title = lecture_title
+    alt_title = title if lecture_title != title else None
     existing = await find_exact(
         subject_id,
         section,
         category,
-        title,
+        lookup_title,
         year_id=year_id,
         lecturer_id=lecturer_id,
+        alt_title=alt_title,
     )
     if existing:
         ctx = context.user_data.setdefault("replace_ctx", {})
@@ -145,11 +163,12 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
+    material_title = lecture_title if lecture_title != title else title
     material_id = await insert_material(
         subject_id,
         section,
         category,
-        title,
+        material_title,
         year_id=year_id,
         lecturer_id=lecturer_id,
         file_unique_id=file_unique_id,
@@ -159,17 +178,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         created_by_admin_id=admin_id,
     )
 
-    lecture_attachment_categories = [
-        "board_images",
-        "slides",
-        "audio",
-        "video",
-        "mind_map",
-        "transcript",
-        "related",
-    ]
     if category in lecture_attachment_categories:
-        lecture_title = f"محاضرة {info.lecture_no}: {info.title}"
         lecture = await find_exact(
             subject_id,
             section,
@@ -177,6 +186,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             lecture_title,
             year_id=year_id,
             lecturer_id=lecturer_id,
+            alt_title=title if lecture_title != title else None,
         )
         if not lecture:
             await insert_material(
