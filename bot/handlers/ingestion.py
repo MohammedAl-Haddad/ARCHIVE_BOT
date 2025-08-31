@@ -332,13 +332,14 @@ async def handle_duplicate_decision(
             "تم الإلغاء.",
             message_thread_id=query.message.message_thread_id,
         )
+        user_id = query.from_user.id
         buttons = [
             [
                 InlineKeyboardButton(
-                    "إبقاء الرسالة", callback_data=f"dup:keep:{msg_id}"
+                    "إبقاء الرسالة", callback_data=f"dup:keep:{msg_id}:{user_id}"
                 ),
                 InlineKeyboardButton(
-                    "حذف الرسالة", callback_data=f"dup:del:{msg_id}"
+                    "حذف الرسالة", callback_data=f"dup:del:{msg_id}:{user_id}"
                 ),
             ]
         ]
@@ -393,8 +394,17 @@ async def handle_duplicate_cancel_choice(
 ) -> None:
     query = update.callback_query
     await query.answer()
-    _, action, msg_id = query.data.split(":")
+    _, action, msg_id, user_id = query.data.split(":")
     msg_id = int(msg_id)
+    user_id = int(user_id)
+    if query.from_user.id != user_id and not is_owner(query.from_user.id):
+        await send_ephemeral(
+            context,
+            query.message.chat_id,
+            "العملية مخصّصة لمرسل الملف",
+            message_thread_id=query.message.message_thread_id,
+        )
+        return
     if action == "del":
         try:
             await context.bot.delete_message(
