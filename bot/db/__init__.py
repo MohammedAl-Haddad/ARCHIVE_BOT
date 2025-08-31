@@ -14,6 +14,7 @@ _SUBMODULES = [
     "groups",
     "ingestions",
     "term_resources",
+    "rbac",
 ]
 
 __all__ = ["init_db", "ensure_owner_full_perms", "is_owner", "has_perm", "MANAGE_ADMINS"]

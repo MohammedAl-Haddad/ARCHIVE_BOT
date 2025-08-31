@@ -12,6 +12,7 @@ from ..db import (
     get_years_for_subject_section,
     get_lecturers_for_subject_section,
     list_lecture_titles,
+    can_view,
 )
 
 # ---------------------------------------------------------------------------
@@ -24,7 +25,7 @@ from ..db import (
 CACHE_TTL_SECONDS = 90  # within the 60-120 second range requested
 
 # cache key -> (timestamp, value)
-_cache: Dict[Tuple[str, Tuple[Any, ...]], Tuple[float, Any]] = {}
+_cache: Dict[Tuple[int | None, str, Tuple[Any, ...]], Tuple[float, Any]] = {}
 
 
 def invalidate() -> None:
@@ -42,6 +43,18 @@ def invalidate() -> None:
 # Node abstraction
 # ---------------------------------------------------------------------------
 Loader = Callable[..., Awaitable[Any]]
+
+# Mapping from a parent node kind to the kind of its children.  Used for
+# permission checks.
+CHILD_KIND: Dict[str, str] = {
+    "root": "level",
+    "level": "term",
+    "term": "subject",
+    "subject": "section",
+    "section": "year",
+    "year": "lecturer",
+    "lecturer": "lecture",
+}
 
 
 @dataclass
@@ -68,14 +81,14 @@ class Node:
         if self.loader is None:
             self.loader = KIND_TO_LOADER.get(self.kind)
 
-    async def children(self) -> Any:
+    async def children(self, user_id: int | None = None) -> Any:
         """Return this node's children using the configured loader.
 
         Results are cached for ``CACHE_TTL_SECONDS`` seconds to reduce database
         load.  The cache can be cleared via :func:`invalidate`.
         """
 
-        key = (self.kind, self.args)
+        key = (user_id, self.kind, self.args)
         now = time.time()
         cached = _cache.get(key)
         if cached and now - cached[0] < CACHE_TTL_SECONDS:
@@ -86,6 +99,15 @@ class Node:
             result: Any = []
         else:
             result = await loader(*self.args)
+
+            child_kind = CHILD_KIND.get(self.kind, self.kind)
+            if isinstance(result, list):
+                filtered = []
+                for item in result:
+                    item_id = item[0] if isinstance(item, (list, tuple)) else item
+                    if await can_view(user_id, child_kind, item_id):
+                        filtered.append(item)
+                result = filtered
 
         _cache[key] = (now, result)
         return result
@@ -105,7 +127,7 @@ KIND_TO_LOADER: Dict[str, Loader] = {
 }
 
 
-async def get_children(kind: str, id: Any | None = None) -> Any:
+async def get_children(kind: str, id: Any | None = None, user_id: int | None = None) -> Any:
     """Return children for the node specified by ``kind`` and ``id``.
 
     The function constructs a :class:`Node` instance, associates the
@@ -116,6 +138,6 @@ async def get_children(kind: str, id: Any | None = None) -> Any:
 
     args = () if id is None else (id,)
     node = Node(kind, args)
-    return await node.children()
+    return await node.children(user_id)
 
 __all__ = ["Node", "invalidate", "KIND_TO_LOADER", "get_children"]
