@@ -300,6 +300,10 @@ async def handle_duplicate_decision(
             context, query.message.chat_id, "العملية مخصّصة لمرسل الملف"
         )
         return
+    try:
+        await query.message.delete()
+    except Exception:
+        await query.edit_message_reply_markup(None)
     if action == "cancel":
         ctx.pop(msg_id, None)
         await send_ephemeral(context, query.message.chat_id, "تم الإلغاء.")
