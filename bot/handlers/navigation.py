@@ -324,6 +324,14 @@ async def echo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if stack:
             top = stack[-1][0]
 
+            # ✅ من شاشة القسم ← ارجع مباشرة لقائمة المواد إذا لم يكن هناك إلا قسم واحد
+            if top == "section":
+                sections = await get_available_sections_for_subject(nav.data["subject_id"])
+                if len(sections) == 1:
+                    nav.back_one()  # أزل شاشة القسم
+                    nav.back_one()  # أزل طبقة المادة للعودة إلى subject_list
+                    return await render_state(update, context)
+
             # ✅ من شاشة السنة → ارجع لقائمة السنوات
             if top == "year_category_menu":
                 nav.back_one()  # أزل شاشة السنة
