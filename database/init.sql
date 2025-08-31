@@ -57,15 +57,18 @@ CREATE TABLE IF NOT EXISTS lecturers (
 );
 
 -- حسابات إدارية
- CREATE TABLE IF NOT EXISTS admins (
-     id INTEGER PRIMARY KEY AUTOINCREMENT,
-     tg_user_id INTEGER UNIQUE,
-     name TEXT,
-     role TEXT NOT NULL,
-     permissions_mask INTEGER NOT NULL,
-     level_scope TEXT DEFAULT 'all',
-     is_active INTEGER NOT NULL DEFAULT 1
- );
+CREATE TABLE IF NOT EXISTS admins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tg_user_id INTEGER UNIQUE,
+    name TEXT,
+    role TEXT NOT NULL,
+    permissions_mask INTEGER NOT NULL,
+    level_scope TEXT DEFAULT 'all',
+    is_active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_admins_tg_user_id
+ON admins(tg_user_id);
 
 -- مجموعات تيليجرام
 CREATE TABLE IF NOT EXISTS groups (
@@ -161,6 +164,9 @@ ON materials(lecturer_id);
 
 CREATE INDEX IF NOT EXISTS idx_materials_admin
 ON materials(created_by_admin_id);
+
+CREATE INDEX IF NOT EXISTS idx_materials_section_created_at
+ON materials(section, created_at);
 
 -- موارد مرتبطة بالترم (مثل جدول الحضور)
 CREATE TABLE IF NOT EXISTS term_resources (
