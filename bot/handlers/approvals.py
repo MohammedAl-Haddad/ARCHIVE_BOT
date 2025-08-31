@@ -11,8 +11,9 @@ from ..db import (
     list_pending_ingestions,
     get_ingestion_material,
     update_ingestion_status,
+    delete_ingestion,
 )
-from ..db.materials import update_material_storage
+from ..db.materials import update_material_storage, delete_material
 from ..utils.telegram import (
     get_file_unique_id_from_message as _get_file_unique_id_from_message,  # noqa: F401
 )
@@ -116,7 +117,9 @@ async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
             logger.info("approved #%s by %s", ingestion_id, user.id)
     else:
-        await update_ingestion_status(ingestion_id, "rejected")
+        if action_type != "replace":
+            await delete_material(material_id)
+        await delete_ingestion(ingestion_id)
         msg = "تم رفض الاستبدال." if action_type == "replace" else "تم رفض المحتوى."
         await context.bot.send_message(
             chat_id=src_chat_id,

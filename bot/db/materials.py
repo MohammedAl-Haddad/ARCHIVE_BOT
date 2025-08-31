@@ -113,6 +113,12 @@ async def get_material_source(
         return (row[0], row[1], row[2]) if row else None
 
 
+async def delete_material(material_id: int) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM materials WHERE id=?", (material_id,))
+        await db.commit()
+
+
 async def insert_year(name: str):
     """Insert a new year record if it does not already exist."""
     async with aiosqlite.connect(DB_PATH) as db:
