@@ -1,5 +1,7 @@
+import asyncio
 import logging
 from telegram import Message
+from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
@@ -51,18 +53,36 @@ async def send_ephemeral(
     seconds: int = 10,
     reply_to_message_id: int | None = None,
 ):
-    """Send a message that auto-deletes after ``seconds`` seconds."""
+    """Send a message that auto-deletes after ``seconds`` seconds.
+
+    The bot must possess the ``Delete messages`` right in group chats.
+    """
     msg = await context.bot.send_message(
         chat_id, text, reply_to_message_id=reply_to_message_id
     )
 
-    async def _delete(ctx: ContextTypes.DEFAULT_TYPE):
+    async def delete_later() -> None:
+        await asyncio.sleep(seconds)
         try:
-            await ctx.bot.delete_message(chat_id, msg.message_id)
-        except Exception as e:  # pragma: no cover
+            await context.bot.delete_message(chat_id, msg.message_id)
+        except TelegramError as e:  # pragma: no cover
             logger.debug("delete failed: %s", e)
 
-    context.job_queue.run_once(_delete, seconds)
+    if msg.chat.type in ("group", "supergroup"):
+        try:
+            member = await context.bot.get_chat_member(chat_id, context.bot.id)
+        except TelegramError as e:  # pragma: no cover
+            logger.debug("member check failed: %s", e)
+            return msg
+        if not getattr(member, "can_delete_messages", False) and getattr(
+            member, "status", ""
+        ) != "creator":
+            logger.debug(
+                "missing Delete messages permission in chat %s", chat_id
+            )
+            return msg
+
+    context.application.create_task(delete_later())
     return msg
 
 
