@@ -48,10 +48,13 @@ async def send_ephemeral(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
     text: str,
-    seconds: int = 7,
+    seconds: int = 10,
+    reply_to_message_id: int | None = None,
 ):
     """Send a message that auto-deletes after ``seconds`` seconds."""
-    msg = await context.bot.send_message(chat_id, text)
+    msg = await context.bot.send_message(
+        chat_id, text, reply_to_message_id=reply_to_message_id
+    )
 
     async def _delete(ctx: ContextTypes.DEFAULT_TYPE):
         try:

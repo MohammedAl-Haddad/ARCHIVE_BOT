@@ -16,6 +16,7 @@ from ..db import (
 from ..db.materials import update_material_storage, delete_material
 from ..utils.telegram import (
     get_file_unique_id_from_message as _get_file_unique_id_from_message,  # noqa: F401
+    send_ephemeral,
 )
 
 
@@ -23,14 +24,30 @@ logger = logging.getLogger("bot.approvals")
 
 async def list_pending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
+    message = update.effective_message
     if not user or not await is_admin(user.id, APPROVE_CONTENT):
-        await update.message.reply_text("عذرًا، لا تملك صلاحية هذا الأمر.")
+        await send_ephemeral(
+            context,
+            message.chat_id,
+            "عذرًا، لا تملك صلاحية هذا الأمر.",
+            reply_to_message_id=message.message_id,
+        )
         return
     pending = await list_pending_ingestions()
     if not pending:
-        await update.message.reply_text("لا توجد رسائل معلقة.")
+        await send_ephemeral(
+            context,
+            message.chat_id,
+            "لا توجد رسائل معلقة.",
+            reply_to_message_id=message.message_id,
+        )
         return
-    await update.message.reply_text("الرسائل المعلقة:")
+    await send_ephemeral(
+        context,
+        message.chat_id,
+        "الرسائل المعلقة:",
+        reply_to_message_id=message.message_id,
+    )
     for ingestion_id, chat_id, msg_id, action_type in pending:
         approve_label = "Approve استبدال" if action_type == "replace" else "Approve"
         buttons = [[
@@ -92,9 +109,10 @@ async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 except Exception as e:
                     logger.warning("delete old message failed: %s", e)
             await update_ingestion_status(ingestion_id, "approved")
-            await context.bot.send_message(
-                chat_id=src_chat_id,
-                text="تم الاستبدال بنجاح وأُضيفت النسخة الجديدة إلى الأرشيف.",
+            await send_ephemeral(
+                context,
+                src_chat_id,
+                "تم الاستبدال بنجاح وأُضيفت النسخة الجديدة إلى الأرشيف.",
                 reply_to_message_id=new_msg_id,
             )
             logger.info(
@@ -110,9 +128,10 @@ async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 material_id, ARCHIVE_CHANNEL_ID, copied.message_id, file_unique_id
             )
             await update_ingestion_status(ingestion_id, "approved")
-            await context.bot.send_message(
-                chat_id=src_chat_id,
-                text="تمت الموافقة وأُضيف المحتوى إلى الأرشيف.",
+            await send_ephemeral(
+                context,
+                src_chat_id,
+                "تمت الموافقة وأُضيف المحتوى إلى الأرشيف.",
                 reply_to_message_id=new_msg_id,
             )
             logger.info("approved #%s by %s", ingestion_id, user.id)
@@ -121,9 +140,10 @@ async def handle_decision(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await delete_material(material_id)
         await delete_ingestion(ingestion_id)
         msg = "تم رفض الاستبدال." if action_type == "replace" else "تم رفض المحتوى."
-        await context.bot.send_message(
-            chat_id=src_chat_id,
-            text=msg,
+        await send_ephemeral(
+            context,
+            src_chat_id,
+            msg,
             reply_to_message_id=new_msg_id,
         )
         logger.info("rejected #%s by %s", ingestion_id, user.id)

@@ -29,7 +29,9 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     text = message.caption or message.text or ""
     info, error = parse_hashtags(text)
     if error:
-        await message.reply_text(error)
+        await send_ephemeral(
+            context, message.chat_id, error, reply_to_message_id=message.message_id
+        )
         return
 
     year = info.year
@@ -56,18 +58,33 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not user:
         logger.warning("No effective user on update")
         if message:
-            await message.reply_text("لا يمكن تحديد المستخدم.")
+            await send_ephemeral(
+                context,
+                message.chat_id,
+                "لا يمكن تحديد المستخدم.",
+                reply_to_message_id=message.message_id,
+            )
         return
 
     admin_info = await get_admin_with_permissions(user.id)
     if admin_info is None:
         logger.warning("User %s is not an admin", user.id)
-        await message.reply_text("المستخدم ليس مشرفًا.")
+        await send_ephemeral(
+            context,
+            message.chat_id,
+            "المستخدم ليس مشرفًا.",
+            reply_to_message_id=message.message_id,
+        )
         return
     admin_id, permissions = admin_info
     if not (permissions & UPLOAD_CONTENT):
         logger.warning("User %s lacks upload permission", user.id)
-        await message.reply_text("لا تملك صلاحية رفع المحتوى.")
+        await send_ephemeral(
+            context,
+            message.chat_id,
+            "لا تملك صلاحية رفع المحتوى.",
+            reply_to_message_id=message.message_id,
+        )
         return
 
     chat = update.effective_chat
@@ -75,27 +92,43 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if chat is None:
         logger.warning("Missing chat %s", chat)
         if message:
-            await message.reply_text("لا يمكن تحديد المحادثة.")
+            await send_ephemeral(
+                context,
+                message.chat_id,
+                "لا يمكن تحديد المحادثة.",
+                reply_to_message_id=message.message_id,
+            )
         return
 
     group_info = await get_group_id_by_chat(chat.id)
     logger.debug("group_info=%s", group_info)
     if group_info is None:
         logger.warning("Group info not found for chat %s", chat.id)
-        await message.reply_text("المجموعة غير معروفة.")
+        await send_ephemeral(
+            context,
+            message.chat_id,
+            "المجموعة غير معروفة.",
+            reply_to_message_id=message.message_id,
+        )
         return
     binding = None
     if category != "attendance":
         if thread_id is None:
-            await message.reply_text(
-                "هذا النوع يتطلب ربط الـTopic بمادة/قسم عبر /insert_sub."
+            await send_ephemeral(
+                context,
+                message.chat_id,
+                "هذا النوع يتطلب ربط الـTopic بمادة/قسم عبر /insert_sub.",
+                reply_to_message_id=message.message_id,
             )
             return
         binding = await get_binding(chat.id, thread_id)
         logger.debug("binding=%s", binding)
         if binding is None:
-            await message.reply_text(
-                "هذا النوع يتطلب ربط الـTopic بمادة/قسم عبر /insert_sub."
+            await send_ephemeral(
+                context,
+                message.chat_id,
+                "هذا النوع يتطلب ربط الـTopic بمادة/قسم عبر /insert_sub.",
+                reply_to_message_id=message.message_id,
             )
             return
         subject_id = binding["subject_id"]
@@ -105,13 +138,23 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         subject_id = section = subject_name = None
 
     if category is None:
-        await message.reply_text("لم يتم التعرف على نوع المحتوى.")
+        await send_ephemeral(
+            context,
+            message.chat_id,
+            "لم يتم التعرف على نوع المحتوى.",
+            reply_to_message_id=message.message_id,
+        )
         return
 
     if category == "attendance":
         term_id = group_info[2]
         await insert_term_resource(term_id, "attendance", chat.id, message.message_id)
-        await message.reply_text("✅ تم الاستلام.")
+        await send_ephemeral(
+            context,
+            chat.id,
+            "✅ تم الاستلام.",
+            reply_to_message_id=message.message_id,
+        )
         return
 
     year_id = await get_or_create_year(str(year)) if year else None
@@ -203,8 +246,11 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         message.message_id, admin_id, file_unique_id=file_unique_id
     )
     await attach_material(ingestion_id, material_id, "pending")
-    await message.reply_text(
-        f"✅ تم الاستلام. رقم العملية: #{ingestion_id}\nسيتم إشعارك بعد المراجعة."
+    await send_ephemeral(
+        context,
+        chat.id,
+        f"✅ تم الاستلام. رقم العملية: #{ingestion_id}\nسيتم إشعارك بعد المراجعة.",
+        reply_to_message_id=message.message_id,
     )
     logger.info(
         "pending #%s subject=%s section=%s year=%s type=%s title=%s",
@@ -259,11 +305,10 @@ async def handle_duplicate_decision(
         msg_id, admin_id, action="replace", file_unique_id=data.get("file_unique_id")
     )
     await attach_material(ingestion_id, old_material_id, "pending")
-    await context.bot.send_message(
-        chat_id=data["chat_id"],
-        text=(
-            f"✅ تم الاستلام. رقم العملية: #{ingestion_id}\nسيتم إشعارك بعد المراجعة."
-        ),
+    await send_ephemeral(
+        context,
+        data["chat_id"],
+        f"✅ تم الاستلام. رقم العملية: #{ingestion_id}\nسيتم إشعارك بعد المراجعة.",
         reply_to_message_id=msg_id,
     )
     summary = (
