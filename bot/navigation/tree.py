@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import time
-from typing import Any, Awaitable, Callable, Dict, Tuple
+from typing import Any, Awaitable, Callable, Dict, Tuple, Optional
 
 from ..db import (
     get_levels,
@@ -62,6 +62,11 @@ class Node:
     kind: str
     args: Tuple[Any, ...] = field(default_factory=tuple)
     label: str = ""
+    loader: Optional[Loader] = None
+
+    def __post_init__(self) -> None:
+        if self.loader is None:
+            self.loader = KIND_TO_LOADER.get(self.kind)
 
     async def children(self) -> Any:
         """Return this node's children using the configured loader.
@@ -76,7 +81,7 @@ class Node:
         if cached and now - cached[0] < CACHE_TTL_SECONDS:
             return cached[1]
 
-        loader = KIND_TO_LOADER.get(self.kind)
+        loader = self.loader
         if loader is None:
             result: Any = []
         else:
@@ -99,4 +104,18 @@ KIND_TO_LOADER: Dict[str, Loader] = {
     "lecturer": list_lecture_titles,
 }
 
-__all__ = ["Node", "invalidate", "KIND_TO_LOADER"]
+
+async def get_children(kind: str, id: Any | None = None) -> Any:
+    """Return children for the node specified by ``kind`` and ``id``.
+
+    The function constructs a :class:`Node` instance, associates the
+    appropriate loader from :data:`KIND_TO_LOADER` and returns the loader
+    result.  Results are cached so repeated calls for the same ``kind``/``id``
+    pair issue at most one database query.
+    """
+
+    args = () if id is None else (id,)
+    node = Node(kind, args)
+    return await node.children()
+
+__all__ = ["Node", "invalidate", "KIND_TO_LOADER", "get_children"]
