@@ -14,6 +14,7 @@ OWNER_TG_ID = config.OWNER_TG_ID
 ADMIN_USER_IDS = config.ADMIN_USER_IDS
 VERSION = config.VERSION
 START_TIME = config.START_TIME
+PER_PAGE = config.PER_PAGE
 
 __all__ = [
     "config",
@@ -25,4 +26,5 @@ __all__ = [
     "ADMIN_USER_IDS",
     "VERSION",
     "START_TIME",
+    "PER_PAGE",
 ]
