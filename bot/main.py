@@ -9,6 +9,7 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     filters,
 )
 
@@ -31,6 +32,8 @@ from .handlers import (
     moderation_handler,
     me_handler,
     version_handler,
+    navtree_start,
+    navtree_callback,
 )
 from .jobs import purge_temp_archives
 from datetime import time
@@ -62,6 +65,7 @@ def main():
     app.add_handler(CommandHandler("start", start, filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("insert_group", insert_group_private, filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("insert_sub", insert_sub_private, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("nav", navtree_start, filters.ChatType.PRIVATE))
     app.add_handler(me_handler)
     app.add_handler(version_handler)
 
@@ -75,6 +79,7 @@ def main():
     app.add_handler(approval_callback)
     app.add_handler(duplicate_callback)
     app.add_handler(duplicate_cancel_callback)
+    app.add_handler(CallbackQueryHandler(navtree_callback))
     app.add_handler(
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, moderation_handler),
         group=-1,
