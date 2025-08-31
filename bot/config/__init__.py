@@ -15,6 +15,8 @@ ADMIN_USER_IDS = config.ADMIN_USER_IDS
 VERSION = config.VERSION
 START_TIME = config.START_TIME
 PER_PAGE = config.PER_PAGE
+NAV_TREE_ENABLED = config.NAV_TREE_ENABLED
+NAV_TREE_SHADOW = config.NAV_TREE_SHADOW
 
 __all__ = [
     "config",
@@ -27,4 +29,6 @@ __all__ = [
     "VERSION",
     "START_TIME",
     "PER_PAGE",
+    "NAV_TREE_ENABLED",
+    "NAV_TREE_SHADOW",
 ]

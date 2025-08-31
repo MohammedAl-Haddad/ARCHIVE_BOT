@@ -3,13 +3,13 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from bot.db import (
-    get_levels,
-    get_terms_by_level,
-    get_subjects_by_level_and_term,
+    get_levels as db_get_levels,
+    get_terms_by_level as db_get_terms_by_level,
+    get_subjects_by_level_and_term as db_get_subjects_by_level_and_term,
     term_feature_flags,
-    get_available_sections_for_subject,
-    get_years_for_subject_section,
-    get_lecturers_for_subject_section,
+    get_available_sections_for_subject as db_get_available_sections_for_subject,
+    get_years_for_subject_section as db_get_years_for_subject_section,
+    get_lecturers_for_subject_section as db_get_lecturers_for_subject_section,
     has_lecture_category,
     get_years_for_subject_section_lecturer,
     get_subject_id_by_name,
@@ -25,6 +25,9 @@ from bot.db import (
     get_types_for_lecture,
     get_year_specials,
 )
+from ..config import NAV_TREE_ENABLED, NAV_TREE_SHADOW
+from ..navigation import NavigationState, Node
+import time
 
 from ..keyboards.constants import (
     main_menu,
@@ -69,8 +72,74 @@ from ..config import ARCHIVE_CHANNEL_ID
 
 logger = logging.getLogger("bot.navigation")
 
-from ..navigation import NavigationState
 
+def _should_shadow() -> bool:
+    return NAV_TREE_SHADOW and not NAV_TREE_ENABLED
+
+
+async def _tree_fetch(kind: str, *args):
+    start = time.perf_counter()
+    node = Node(kind, args)
+    result = await node.children()
+    duration = time.perf_counter() - start
+    count = len(result) if hasattr(result, "__len__") else 0
+    mode = "shadow" if _should_shadow() else "live"
+    logger.info("nav-tree %s %s%r -> %d in %.3fms", mode, kind, args, count, duration * 1000)
+    return result
+
+
+async def get_levels():
+    if NAV_TREE_ENABLED:
+        return await _tree_fetch("root")
+    levels = await db_get_levels()
+    if NAV_TREE_SHADOW:
+        await _tree_fetch("root")
+    return levels
+
+
+async def get_terms_by_level(level_id: int):
+    if NAV_TREE_ENABLED:
+        return await _tree_fetch("level", level_id)
+    terms = await db_get_terms_by_level(level_id)
+    if NAV_TREE_SHADOW:
+        await _tree_fetch("level", level_id)
+    return terms
+
+
+async def get_subjects_by_level_and_term(level_id: int, term_id: int):
+    if NAV_TREE_ENABLED:
+        return await _tree_fetch("term", level_id, term_id)
+    subjects = await db_get_subjects_by_level_and_term(level_id, term_id)
+    if NAV_TREE_SHADOW:
+        await _tree_fetch("term", level_id, term_id)
+    return subjects
+
+
+async def get_available_sections_for_subject(subject_id: int):
+    if NAV_TREE_ENABLED:
+        return await _tree_fetch("subject", subject_id)
+    sections = await db_get_available_sections_for_subject(subject_id)
+    if NAV_TREE_SHADOW:
+        await _tree_fetch("subject", subject_id)
+    return sections
+
+
+async def get_years_for_subject_section(subject_id: int, section_code: str):
+    if NAV_TREE_ENABLED:
+        return await _tree_fetch("section", subject_id, section_code)
+    years = await db_get_years_for_subject_section(subject_id, section_code)
+    if NAV_TREE_SHADOW:
+        await _tree_fetch("section", subject_id, section_code)
+    return years
+
+
+async def get_lecturers_for_subject_section(subject_id: int, section_code: str):
+    if NAV_TREE_ENABLED:
+        return await _tree_fetch("year", subject_id, section_code)
+    lecturers = await db_get_lecturers_for_subject_section(subject_id, section_code)
+    if NAV_TREE_SHADOW:
+        await _tree_fetch("year", subject_id, section_code)
+    return lecturers
 
 async def _prepare_lectures_menu(
     subject_id: int,
