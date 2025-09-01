@@ -132,6 +132,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     query = update.callback_query
     data = query.data if query else ""
+    if data.startswith("nav:"):
+        data = data[4:]
     stack = NavStack(context.user_data)
 
     if data == "back":

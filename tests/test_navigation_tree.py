@@ -76,7 +76,7 @@ def test_back_button_pops_stack(monkeypatch, navtree):
     stack.push(("level", 1, "L1"))
     stack.push(("term", 2, "T1"))
 
-    query = SimpleNamespace(data="back", message=DummyMessage(), answer=AsyncMock())
+    query = SimpleNamespace(data="nav:back", message=DummyMessage(), answer=AsyncMock())
     update = SimpleNamespace(callback_query=query, effective_user=None)
 
     render_mock = AsyncMock()
