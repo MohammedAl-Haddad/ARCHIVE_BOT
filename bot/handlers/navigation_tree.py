@@ -7,6 +7,7 @@ import time
 import logging
 
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from ..navigation.nav_stack import NavStack
@@ -85,7 +86,15 @@ async def _render(
 
     message_start = time.perf_counter()
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+        current = update.callback_query.message
+        if current and current.text == text and current.reply_markup == keyboard:
+            return
+        try:
+            await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+        except BadRequest as err:
+            if "Message is not modified" not in err.message:
+                raise
+            return
     else:
         await update.message.reply_text(text, reply_markup=keyboard)
     message_edit_time = time.perf_counter() - message_start
