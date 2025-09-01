@@ -209,5 +209,6 @@ CREATE TABLE IF NOT EXISTS term_resources (
 -- DROP TABLE term_resources_old;
 -- COMMIT;
 
-CREATE INDEX IF NOT EXISTS idx_term_resources_level_term_kind
-ON term_resources(level_id, term_id, kind);
+-- Removed index creation; handled in migration
+-- CREATE INDEX IF NOT EXISTS idx_term_resources_level_term_kind
+-- ON term_resources(level_id, term_id, kind);
