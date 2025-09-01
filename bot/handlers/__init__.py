@@ -1,7 +1,6 @@
 """Convenience re-exports for handler callables."""
 
 from .start import start
-from .navigation import echo_handler
 from .topics import insert_sub_conv, insert_sub_private
 from .ingestion import (
     ingestion_handler,
@@ -17,7 +16,6 @@ from .navigation_tree import navtree_start, navtree_callback
 
 __all__ = [
     "start",
-    "echo_handler",
     "insert_sub_conv",
     "insert_sub_private",
     "ingestion_handler",
