@@ -24,6 +24,21 @@ from ..utils.telegram import send_ephemeral, get_file_unique_id_from_message
 logger = logging.getLogger(__name__)
 
 
+TERM_RESOURCE_TYPES = {
+    "attendance",
+    "study_plan",
+    "channels",
+    "outcomes",
+    "tips",
+    "projects",
+    "programs",
+    "apps",
+    "skills",
+    "forums",
+    "sites",
+}
+
+
 async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     file_unique_id = get_file_unique_id_from_message(message)
@@ -122,7 +137,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
     binding = None
-    if category != "attendance":
+    if category not in TERM_RESOURCE_TYPES:
         if thread_id is None:
             await send_ephemeral(
                 context,
@@ -159,9 +174,9 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
-    if category == "attendance":
+    if category in TERM_RESOURCE_TYPES:
         term_id = group_info[2]
-        await insert_term_resource(term_id, "attendance", chat.id, message.message_id)
+        await insert_term_resource(term_id, category, chat.id, message.message_id)
         await send_ephemeral(
             context,
             chat.id,
