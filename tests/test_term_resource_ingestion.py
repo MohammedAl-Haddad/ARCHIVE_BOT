@@ -2,6 +2,7 @@ import pytest
 from types import SimpleNamespace
 
 from bot.handlers import ingestion
+from bot.parser.hashtags import TERM_RESOURCE_ALIASES
 
 pytestmark = pytest.mark.anyio
 
@@ -14,16 +15,9 @@ def anyio_backend():
 @pytest.mark.parametrize(
     "tag, kind",
     [
-        ("#الخطة_الدراسية", "study_plan"),
-        ("#روابط_القنوات", "channels"),
-        ("#مخرجات_التعلم", "outcomes"),
-        ("#نصائح", "tips"),
-        ("#مشاريع", "projects"),
-        ("#برامج", "programs"),
-        ("#تطبيقات", "apps"),
-        ("#مهارات", "skills"),
-        ("#منتديات", "forums"),
-        ("#مواقع", "sites"),
+        (f"#{alias}", kind)
+        for kind, aliases in TERM_RESOURCE_ALIASES.items()
+        for alias in aliases
     ],
 )
 async def test_term_resource_ingestion(tag, kind, monkeypatch):

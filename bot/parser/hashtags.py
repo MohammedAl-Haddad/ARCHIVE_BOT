@@ -7,10 +7,12 @@ direction markers, convert Eastern Arabic digits to their Latin
 representation and then extract structured information from the ordered list
 of hashtags.
 
-The parser understands a small, fixed set of Arabic hashtags that indicate
-the *content type* in addition to generic tags for the lecture number, year
-and lecturer name.  The order of these tags is significant and is validated
-according to the rules described in :mod:`README`.
+The parser understands a small, fixed set of hashtags that indicate the
+*content type* in addition to generic tags for the lecture number, year and
+lecturer name.  Term resources such as study plans or channel links accept
+four hashtag aliases each which are enumerated in ``TERM_RESOURCE_ALIASES``.
+The order of these tags is significant and is validated according to the
+rules described in :mod:`README`.
 """
 
 from __future__ import annotations
@@ -38,6 +40,78 @@ def _clean(text: str) -> str:
 # Tag extraction
 # ---------------------------------------------------------------------------
 
+# Each tuple lists the four accepted hashtag aliases for a term resource.
+# Content editors may use any of the variants and the parser will normalise
+# them to the corresponding category.
+TERM_RESOURCE_ALIASES = {
+    "attendance": (
+        "جدول_الحضور",
+        "الحضور",
+        "جدول_الغياب",
+        "attendance",
+    ),
+    "study_plan": (
+        "الخطة_الدراسية",
+        "الخطة",
+        "خطة_الدراسة",
+        "study_plan",
+    ),
+    "channels": (
+        "روابط_القنوات",
+        "القنوات",
+        "قنوات",
+        "channels",
+    ),
+    "outcomes": (
+        "مخرجات_التعلم",
+        "مخرجات",
+        "نتائج_التعلم",
+        "outcomes",
+    ),
+    "tips": (
+        "نصائح",
+        "نصيحة",
+        "study_tips",
+        "tips",
+    ),
+    "projects": (
+        "مشاريع",
+        "المشاريع",
+        "project_ideas",
+        "projects",
+    ),
+    "programs": (
+        "برامج",
+        "البرامج",
+        "software",
+        "programs",
+    ),
+    "apps": (
+        "تطبيقات",
+        "التطبيقات",
+        "applications",
+        "apps",
+    ),
+    "skills": (
+        "مهارات",
+        "المهارات",
+        "competencies",
+        "skills",
+    ),
+    "forums": (
+        "منتديات",
+        "المنتديات",
+        "communities",
+        "forums",
+    ),
+    "sites": (
+        "مواقع",
+        "المواقع",
+        "websites",
+        "sites",
+    ),
+}
+
 CONTENT_TYPE_ALIASES = {
     "موجز_يومي": "daily_brief",
     "صور_السبورة": "board_images",
@@ -45,17 +119,8 @@ CONTENT_TYPE_ALIASES = {
     "نموذج_النصفي": "exam_mid",
     "نموذج_النهائي": "exam_final",
     "التوصيف": "syllabus",
-    "جدول_الحضور": "attendance",
-    "الخطة_الدراسية": "study_plan",
-    "روابط_القنوات": "channels",
-    "مخرجات_التعلم": "outcomes",
-    "نصائح": "tips",
-    "مشاريع": "projects",
-    "برامج": "programs",
-    "تطبيقات": "apps",
-    "مهارات": "skills",
-    "منتديات": "forums",
-    "مواقع": "sites",
+    # Term resource aliases
+    **{alias: key for key, aliases in TERM_RESOURCE_ALIASES.items() for alias in aliases},
     # Existing types kept for backwards compatibility
     "slides": "slides",
     "audio": "audio",
@@ -246,5 +311,5 @@ def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
     return info, None
 
 
-__all__ = ["parse_hashtags", "ParsedHashtags"]
+__all__ = ["parse_hashtags", "ParsedHashtags", "TERM_RESOURCE_ALIASES"]
 
