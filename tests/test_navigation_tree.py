@@ -1,0 +1,122 @@
+import os
+import asyncio
+import logging
+from importlib import import_module
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import pytest
+
+os.environ.setdefault("BOT_TOKEN", "test")
+os.environ.setdefault("ARCHIVE_CHANNEL_ID", "1")
+os.environ.setdefault("OWNER_TG_ID", "1")
+
+from bot.navigation import NavigationState, NavStack
+
+
+class DummyMessage:
+    def __init__(self):
+        self.sent = []
+
+    async def reply_text(self, text, reply_markup=None):
+        self.sent.append((text, reply_markup))
+
+    async def edit_message_text(self, text, reply_markup=None):
+        self.sent.append((text, reply_markup))
+
+
+@pytest.fixture
+def navtree():
+    return import_module("bot.handlers.navigation_tree")
+
+
+def test_path_consistency_between_systems():
+    # old navigation
+    ud_old = {}
+    old_state = NavigationState(ud_old)
+    old_state.set_level("L1", 1)
+    old_state.set_term("T1", 1)
+    old_state.set_subject("S1", 1)
+    old_state.set_year("Y1", 1)
+    old_state.set_section("Sec", "sec")
+    old_state.set_lecture("Mat")
+    old_path = " / ".join(label for _, label in old_state.stack if label)
+
+    # new navigation tree
+    ud_new = {}
+    stack = NavStack(ud_new)
+    stack.push(("level", 1, "L1"))
+    stack.push(("term", 1, "T1"))
+    stack.push(("subject", 1, "S1"))
+    stack.push(("year", 1, "Y1"))
+    stack.push(("section", "sec", "Sec"))
+    stack.push(("lecture", None, "Mat"))
+    new_path = stack.path_text()
+
+    assert new_path == old_path == "L1 / T1 / S1 / Y1 / Sec / Mat"
+
+
+@pytest.fixture
+def large_dataset(monkeypatch, navtree):
+    async def fake_get_children(kind, ident, user_id):
+        await asyncio.sleep(0.01)
+        return [(i, f"Item {i}") for i in range(1000)]
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+    return navtree
+
+
+def test_db_time_logged(large_dataset, caplog):
+    navtree = large_dataset
+    update = SimpleNamespace(message=DummyMessage(), callback_query=None, effective_user=SimpleNamespace(id=1))
+    context = SimpleNamespace(user_data={})
+
+    async def run():
+        with caplog.at_level(logging.INFO):
+            await navtree._render(update, context, "root", None, 1, action="test")
+
+    asyncio.run(run())
+
+    record = next(r for r in caplog.records if "db_time=" in r.message)
+    db_time_ms = float(record.message.split("db_time=")[1].split("ms")[0])
+    assert db_time_ms > 0
+
+
+def test_back_button_pops_stack(monkeypatch, navtree):
+    context = SimpleNamespace(user_data={})
+    stack = NavStack(context.user_data)
+    stack.push(("level", 1, "L1"))
+    stack.push(("term", 2, "T1"))
+
+    query = SimpleNamespace(data="back", message=DummyMessage(), answer=AsyncMock())
+    update = SimpleNamespace(callback_query=query, effective_user=None)
+
+    render_mock = AsyncMock()
+    monkeypatch.setattr(navtree, "_render_current", render_mock)
+
+    asyncio.run(navtree.navtree_callback(update, context))
+
+    assert stack.path_text() == "L1"
+    render_mock.assert_called_once()
+
+
+def test_permission_filter(monkeypatch, navtree):
+    from bot.navigation import tree as tree_module
+
+    async def fake_loader():
+        return [(1, "L1"), (2, "L2")]
+
+    async def fake_can_view(user_id, kind, item_id):
+        return item_id == 1
+
+    tree_module.invalidate()
+    monkeypatch.setitem(tree_module.KIND_TO_LOADER, "root", fake_loader)
+    monkeypatch.setattr(tree_module, "can_view", fake_can_view)
+
+    ctx = SimpleNamespace(user_data={})
+
+    async def run():
+        return await navtree._load_children(ctx, "root", None, user_id=5)
+
+    children = asyncio.run(run())
+    assert children == [("level", 1, "L1")]
