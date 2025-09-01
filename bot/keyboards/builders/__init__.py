@@ -1,23 +1,47 @@
 from telegram import ReplyKeyboardMarkup
 
-from ..constants import (
-    TERM_MENU_SHOW_SUBJECTS,
-    TERM_MENU_PLAN,
-    TERM_MENU_LINKS,
-    TERM_MENU_ADV_SEARCH,
-    BACK,
-    BACK_TO_LEVELS,
-    BACK_TO_SUBJECTS,
-    FILTER_BY_YEAR,
-    FILTER_BY_LECTURER,
-    LIST_LECTURES,
-    YEAR_MENU_LECTURES,
-    SECTION_LABELS,
-    CATEGORY_TO_LABEL,
-    LIST_LECTURES_FOR_LECTURER,
-)
-
 from ...utils.formatting import arabic_ordinal, format_lecturer_name
+
+TERM_MENU_SHOW_SUBJECTS = "📖 عرض المواد"
+TERM_MENU_PLAN = "🗂 الخطة الدراسية"
+TERM_MENU_LINKS = "🔗 روابط المجموعات والقنوات"
+TERM_MENU_ADV_SEARCH = "🔎 البحث المتقدم"
+
+BACK = "🔙 العودة"
+BACK_TO_LEVELS = "🔙 العودة لقائمة المستويات"
+BACK_TO_SUBJECTS = "🔙 العودة لقائمة المواد"
+
+FILTER_BY_YEAR = "📂 حسب السنة"
+FILTER_BY_LECTURER = "👨‍🏫 حسب المحاضر"
+LIST_LECTURES = "📚 عرض المحاضرات"
+YEAR_MENU_LECTURES = "📚 المحاضرات"
+
+SECTION_LABELS = {
+    "theory": "📚 نظري",
+    "discussion": "💬 مناقشة",
+    "lab": "🧪 عملي",
+    "syllabus": "📄 المفردات الدراسية",
+    "apps": "📱 تطبيقات",
+}
+
+CATEGORY_TO_LABEL = {
+    "lecture": "📄 ملف المحاضرة",
+    "slides": "📑 سلايدات المحاضرة",
+    "audio": "🎧 تسجيل صوتي",
+    "video": "🎥 تسجيل فيديو",
+    "board_images": "🖼️ صور السبورة",
+    "external_link": "🔗 روابط خارجية",
+    "exam": "📝 الامتحانات",
+    "booklet": "📘 الملازم",
+    "summary": "🧾 ملخص",
+    "notes": "🗒️ ملاحظات",
+    "simulation": "🧪 محاكاة",
+    "mind_map": "🗺️ خرائط ذهنية",
+    "transcript": "⌨️ تفريغ صوتي",
+    "related": "📎 ملفات ذات صلة",
+}
+
+LIST_LECTURES_FOR_LECTURER = "📚 محاضرات هذا المحاضر"
 
 
 def _rows(items: list[str], cols: int = 2) -> list[list[str]]:
