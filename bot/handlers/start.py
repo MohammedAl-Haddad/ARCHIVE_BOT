@@ -12,6 +12,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_admin = False
     if user:
         is_admin = is_owner(user.id) or await has_perm(user.id, MANAGE_ADMINS)
+    # أرسل قائمة البداية باستخدام لوحة أزرار Inline
     await update.message.reply_text(
         "👋 مرحبًا بك في بوت أرشيف قسم الميكاترونكس.\nاختر من القائمة:",
         reply_markup=build_main_menu(is_admin),

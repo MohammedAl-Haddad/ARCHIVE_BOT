@@ -33,6 +33,7 @@ from .handlers import (
     version_handler,
     navtree_start,
     navtree_callback,
+    main_menu_callback,
 )
 from .jobs import purge_temp_archives
 from datetime import time
@@ -78,6 +79,7 @@ def main():
     app.add_handler(approval_callback)
     app.add_handler(duplicate_callback)
     app.add_handler(duplicate_cancel_callback)
+    app.add_handler(CallbackQueryHandler(main_menu_callback, pattern="^menu:"))
     app.add_handler(CallbackQueryHandler(navtree_callback, pattern="^nav:"))
     app.add_handler(
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, moderation_handler),
