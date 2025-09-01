@@ -197,6 +197,7 @@ def test_parse_id_handles_composite(navtree):
     assert navtree._parse_id("abc") == "abc"
     assert navtree._parse_id("1-2") == (1, 2)
     assert navtree._parse_id("123-theory") == (123, "theory")
+    assert navtree._parse_id("123-field_trip") == (123, "field_trip")
 
 
 def test_load_children_merges_level_and_term(monkeypatch, navtree):
@@ -220,7 +221,7 @@ def test_load_children_merges_subject_and_section(monkeypatch, navtree):
     async def fake_get_children(kind, ident, user_id):
         assert kind == "subject"
         assert ident == 7
-        return ["theory", "lab"]
+        return ["theory", "lab", "field_trip"]
 
     monkeypatch.setattr(navtree, "get_children", fake_get_children)
 
@@ -233,6 +234,7 @@ def test_load_children_merges_subject_and_section(monkeypatch, navtree):
     assert children == [
         ("section", "7-theory", "theory"),
         ("section", "7-lab", "lab"),
+        ("section", "7-field_trip", "field_trip"),
     ]
 
 

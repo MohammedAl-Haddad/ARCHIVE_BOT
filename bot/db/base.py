@@ -10,6 +10,15 @@ async def _column_exists(db: aiosqlite.Connection, table: str, column: str) -> b
     return column in cols
 
 
+async def _table_has_text(db: aiosqlite.Connection, table: str, text: str) -> bool:
+    cur = await db.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    )
+    row = await cur.fetchone()
+    return row is not None and text in row[0]
+
+
 async def _migrate(db: aiosqlite.Connection) -> None:
     """Apply additive schema updates (DB v2)."""
     # subjects.sections_mode
@@ -86,7 +95,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
             group_id INTEGER NOT NULL,
             tg_topic_id INTEGER NOT NULL,
             subject_id INTEGER NOT NULL,
-            section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab')),
+            section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab','field_trip')),
             FOREIGN KEY (group_id) REFERENCES groups(id),
             FOREIGN KEY (subject_id) REFERENCES subjects(id),
             UNIQUE (group_id, tg_topic_id)
@@ -123,6 +132,72 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         if not await _column_exists(db, "ingestions", col):
             await db.execute(f"ALTER TABLE ingestions ADD COLUMN {col} {col_type}")
 
+    # ensure section constraints allow field_trip
+    if not await _table_has_text(db, "topics", "'field_trip'"):
+        await db.executescript(
+            """
+            ALTER TABLE topics RENAME TO topics_old;
+            CREATE TABLE topics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL,
+                tg_topic_id INTEGER NOT NULL,
+                subject_id INTEGER NOT NULL,
+                section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab','field_trip')),
+                FOREIGN KEY (group_id) REFERENCES groups(id),
+                FOREIGN KEY (subject_id) REFERENCES subjects(id),
+                UNIQUE (group_id, tg_topic_id)
+            );
+            INSERT INTO topics (id, group_id, tg_topic_id, subject_id, section)
+            SELECT id, group_id, tg_topic_id, subject_id, section FROM topics_old;
+            DROP TABLE topics_old;
+            """
+        )
+
+    if not await _table_has_text(db, "materials", "'field_trip'"):
+        await db.executescript(
+            """
+            ALTER TABLE materials RENAME TO materials_old;
+            CREATE TABLE materials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject_id INTEGER NOT NULL,
+                section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab','field_trip','syllabus','apps')),
+                category TEXT NOT NULL CHECK(category IN (
+                    'lecture','slides','audio','exam','booklet','board_images','video','simulation',
+                    'summary','notes','external_link','mind_map','transcript','related'
+                )),
+                title TEXT NOT NULL,
+                url TEXT,
+                year_id INTEGER,
+                lecturer_id INTEGER,
+                tg_storage_chat_id INTEGER,
+                tg_storage_msg_id INTEGER,
+                file_unique_id TEXT,
+                source_chat_id INTEGER,
+                source_topic_id INTEGER,
+                source_message_id INTEGER,
+                created_by_admin_id INTEGER,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (subject_id) REFERENCES subjects(id),
+                FOREIGN KEY (year_id) REFERENCES years(id),
+                FOREIGN KEY (lecturer_id) REFERENCES lecturers(id),
+                FOREIGN KEY (created_by_admin_id) REFERENCES admins(id)
+            );
+            INSERT INTO materials (
+                id, subject_id, section, category, title, url, year_id, lecturer_id,
+                tg_storage_chat_id, tg_storage_msg_id, file_unique_id,
+                source_chat_id, source_topic_id, source_message_id,
+                created_by_admin_id, created_at
+            )
+            SELECT
+                id, subject_id, section, category, title, url, year_id, lecturer_id,
+                tg_storage_chat_id, tg_storage_msg_id, file_unique_id,
+                source_chat_id, source_topic_id, source_message_id,
+                created_by_admin_id, created_at
+            FROM materials_old;
+            DROP TABLE materials_old;
+            """
+        )
+
     # term_resources level_id column and index
     if not await _column_exists(db, "term_resources", "level_id"):
         await db.execute("ALTER TABLE term_resources ADD COLUMN level_id INTEGER")
@@ -153,10 +228,28 @@ async def _migrate(db: aiosqlite.Connection) -> None:
 
     # indexes
     await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_materials_subject ON materials(subject_id)"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_materials_year ON materials(year_id)"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_materials_lecturer ON materials(lecturer_id)"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_materials_admin ON materials(created_by_admin_id)"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_materials_section_created_at ON materials(section, created_at)"
+    )
+    await db.execute(
         "CREATE INDEX IF NOT EXISTS idx_materials_core ON materials(subject_id, section, year_id, category)"
     )
     await db.execute(
         "CREATE INDEX IF NOT EXISTS idx_materials_storage ON materials(tg_storage_chat_id, tg_storage_msg_id)"
+    )
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_topics_subject ON topics(subject_id)"
     )
     await db.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_topics_chat ON topics(group_id, tg_topic_id)"
