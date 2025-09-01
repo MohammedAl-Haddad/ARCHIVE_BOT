@@ -227,15 +227,6 @@
                 "language": "Python"
               },
               {
-                "name": "navigation.py",
-                "path": "bot/handlers/navigation.py",
-                "kind": "file",
-                "description": "Python source file.",
-                "sizeBytes": 35871,
-                "lines": 734,
-                "language": "Python"
-              },
-              {
                 "name": "start.py",
                 "path": "bot/handlers/start.py",
                 "kind": "file",

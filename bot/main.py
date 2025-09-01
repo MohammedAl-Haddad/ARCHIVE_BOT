@@ -18,7 +18,6 @@ from bot.db import init_db, ensure_owner_full_perms
 from bot.utils.logging import setup_logging
 from .handlers import (
     start,
-    echo_handler,
     insert_sub_conv,
     insert_sub_private,
     ingestion_handler,
@@ -93,11 +92,6 @@ def main():
         ),
         group=1,
     )
-    app.add_handler(
-        MessageHandler(
-            filters.ChatType.PRIVATE & filters.TEXT & ~filters.COMMAND, echo_handler
-        )
-    )
 
     app.job_queue.run_daily(purge_temp_archives, time=time(hour=0, minute=0))
 
@@ -113,7 +107,6 @@ def main():
                 "  /me -> private",
                 "  /version -> private",
                 "  ingestion (#) -> groups",
-                "  unknown-text -> private only",
             ]
         )
     )
