@@ -288,9 +288,10 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 return
             if len(sections) == 1:
                 section_kind, section_id, section_label = sections[0]
-                stack.push((section_kind, section_id, section_label))
+                section_ident = _parse_id(str(section_id))
+                stack.push((section_kind, section_ident, section_label))
                 try:
-                    await _render(update, context, section_kind, section_id, 1, action="push")
+                    await _render(update, context, section_kind, section_ident, 1, action="push")
                     if query:
                         await query.answer()
                 except Exception:
