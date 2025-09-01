@@ -331,15 +331,6 @@
                 "lines": 5,
                 "language": "Python"
               },
-              {
-                "name": "state.py",
-                "path": "bot/navigation/state.py",
-                "kind": "file",
-                "description": "Navigation state management as a class.  This module defines :class:`NavigationState` which encapsulates all logic that previously lived as standalone helper functions.  The class stores a reference to ``user_data`` provided by ``telegram.ext`` and exposes methods such as ``set_level`` and ``back_one`` to manipulate the navigation stack.",
-                "sizeBytes": 5030,
-                "lines": 155,
-                "language": "Python"
-              }
             ]
           },
           {

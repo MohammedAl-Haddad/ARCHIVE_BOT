@@ -11,7 +11,7 @@ os.environ.setdefault("BOT_TOKEN", "test")
 os.environ.setdefault("ARCHIVE_CHANNEL_ID", "1")
 os.environ.setdefault("OWNER_TG_ID", "1")
 
-from bot.navigation import NavigationState, NavStack
+from bot.navigation import NavStack
 
 
 class DummyMessage:
@@ -30,19 +30,7 @@ def navtree():
     return import_module("bot.handlers.navigation_tree")
 
 
-def test_path_consistency_between_systems():
-    # old navigation
-    ud_old = {}
-    old_state = NavigationState(ud_old)
-    old_state.set_level("L1", 1)
-    old_state.set_term("T1", 1)
-    old_state.set_subject("S1", 1)
-    old_state.set_year("Y1", 1)
-    old_state.set_section("Sec", "sec")
-    old_state.set_lecture("Mat")
-    old_path = " / ".join(label for _, label in old_state.stack if label)
-
-    # new navigation tree
+def test_nav_stack_path():
     ud_new = {}
     stack = NavStack(ud_new)
     stack.push(("level", 1, "L1"))
@@ -53,7 +41,7 @@ def test_path_consistency_between_systems():
     stack.push(("lecture", None, "Mat"))
     new_path = stack.path_text()
 
-    assert new_path == old_path == "L1 / T1 / S1 / Y1 / Sec / Mat"
+    assert new_path == "L1 / T1 / S1 / Y1 / Sec / Mat"
 
 
 @pytest.fixture
