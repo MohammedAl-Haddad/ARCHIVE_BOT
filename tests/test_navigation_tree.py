@@ -158,3 +158,42 @@ def test_permission_filter(monkeypatch, navtree):
 
     children = asyncio.run(run())
     assert children == [("level", 1, "L1")]
+
+
+def test_parse_id_handles_composite(navtree):
+    assert navtree._parse_id("5") == 5
+    assert navtree._parse_id("abc") == "abc"
+    assert navtree._parse_id("1-2") == (1, 2)
+
+
+def test_load_children_merges_level_and_term(monkeypatch, navtree):
+    async def fake_get_children(kind, ident, user_id):
+        assert kind == "level"
+        assert ident == 1
+        return [(1, "T1"), (2, "T2")]
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+
+    ctx = SimpleNamespace(user_data={})
+
+    async def run():
+        return await navtree._load_children(ctx, "level", 1, user_id=None)
+
+    children = asyncio.run(run())
+    assert children == [("term", "1-1", "T1"), ("term", "1-2", "T2")]
+
+
+def test_get_children_accepts_composite(monkeypatch):
+    from bot.navigation import tree as tree_module
+
+    called = {}
+
+    async def fake_loader(level_id, term_id):
+        called["args"] = (level_id, term_id)
+        return []
+
+    monkeypatch.setitem(tree_module.KIND_TO_LOADER, "term", fake_loader)
+
+    asyncio.run(tree_module.get_children("term", (3, 4)))
+
+    assert called["args"] == (3, 4)

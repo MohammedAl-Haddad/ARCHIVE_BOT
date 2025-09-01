@@ -132,11 +132,12 @@ async def get_children(kind: str, id: Any | None = None, user_id: int | None = N
 
     The function constructs a :class:`Node` instance, associates the
     appropriate loader from :data:`KIND_TO_LOADER` and returns the loader
-    result.  Results are cached so repeated calls for the same ``kind``/``id``
-    pair issue at most one database query.
+    result.  ``id`` may be a tuple of identifiers which will be expanded into
+    positional arguments for the loader.  Results are cached so repeated calls
+    for the same ``kind``/``id`` pair issue at most one database query.
     """
 
-    args = () if id is None else (id,)
+    args = id if isinstance(id, tuple) else (() if id is None else (id,))
     node = Node(kind, args)
     return await node.children(user_id)
 
