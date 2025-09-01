@@ -26,7 +26,7 @@ LAST_CHILDREN_TTL_SECONDS = CACHE_TTL_SECONDS
 async def _load_children(
     context: ContextTypes.DEFAULT_TYPE,
     kind: str,
-    ident: Optional[int | str | tuple[int, int]],
+    ident: Optional[int | str | tuple[int, int | str]],
     user_id: int | None,
 ):
     """Return children for ``kind``/``ident`` using a short-lived cache."""
@@ -53,6 +53,8 @@ async def _load_children(
             item_label = str(item)
         if kind == "level" and child_kind == "term":
             item_id = f"{ident}-{item_id}"
+        elif kind == "subject" and child_kind == "section":
+            item_id = f"{ident}-{item_id}"
         children.append((child_kind, item_id, item_label))
     context.user_data[LAST_CHILDREN_KEY] = {
         "node_key": node_key,
@@ -66,7 +68,7 @@ async def _render(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     kind: str,
-    ident: Optional[int | str | tuple[int, int]],
+    ident: Optional[int | str | tuple[int, int | str]],
     page: int,
     action: str,
 ) -> None:
@@ -112,10 +114,12 @@ async def _render(
     )
 
 
-def _parse_id(value: str) -> int | tuple[int, int] | str:
+def _parse_id(value: str) -> int | tuple[int, int | str] | str:
     if "-" in value:
         a, b = value.split("-", 1)
-        return int(a), int(b)
+        a_val = int(a) if a.isdigit() else a
+        b_val = int(b) if b.isdigit() else b
+        return a_val, b_val
     return int(value) if value.isdigit() else value
 
 
