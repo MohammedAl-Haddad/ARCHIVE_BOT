@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from ..keyboards.builders import build_main_menu
+from ..keyboards.builders.main_menu import build_main_menu
 from ..navigation import NavStack
 from bot.db import is_owner, has_perm, MANAGE_ADMINS
 
