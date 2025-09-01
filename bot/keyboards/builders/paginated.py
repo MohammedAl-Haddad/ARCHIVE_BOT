@@ -12,6 +12,7 @@ def build_children_keyboard(
     children: Sequence[Tuple[str, int | str, str]],
     page: int,
     per_page: int | None = None,
+    include_back: bool = True,
 ) -> InlineKeyboardMarkup:
     """Build a paginated inline keyboard for navigation children.
 
@@ -24,6 +25,8 @@ def build_children_keyboard(
     per_page:
         Number of items to show per page.  Defaults to the global
         :data:`PER_PAGE` configuration value when ``None``.
+    include_back:
+        Whether to include a "back" button at the bottom of the keyboard.
     """
 
     if per_page is None:
@@ -56,5 +59,6 @@ def build_children_keyboard(
     if nav_row:
         keyboard.append(nav_row)
 
-    keyboard.append([InlineKeyboardButton(text="🔙", callback_data="nav:back")])
+    if include_back:
+        keyboard.append([InlineKeyboardButton(text="🔙", callback_data="nav:back")])
     return InlineKeyboardMarkup(keyboard)
