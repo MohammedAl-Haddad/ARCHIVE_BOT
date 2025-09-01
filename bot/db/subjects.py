@@ -163,11 +163,15 @@ async def get_terms_by_level(level_id: int):
 
 
 async def get_subjects_by_level_and_term(level_id: int, term_id: int):
-    """Return subject names that have materials for level/term as [(name,), ...]."""
+    """Return subjects with available materials for a level/term.
+
+    The result is a list of ``(id, name)`` pairs ordered by subject id.
+    """
+
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             """
-            SELECT DISTINCT s.name
+            SELECT DISTINCT s.id, s.name
             FROM subjects s
             JOIN materials m ON m.subject_id = s.id
             WHERE s.level_id = ? AND s.term_id = ?
