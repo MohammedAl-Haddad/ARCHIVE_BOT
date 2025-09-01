@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 import time
+import logging
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -11,10 +12,11 @@ from telegram.ext import ContextTypes
 from ..navigation.nav_stack import NavStack
 from ..navigation.tree import get_children, CHILD_KIND, CACHE_TTL_SECONDS
 from ..keyboards.builders.paginated import build_children_keyboard
+from ..utils.retry import retry
 
-# Key used to cache the most recently fetched children list.
+logger = logging.getLogger(__name__)
+
 LAST_CHILDREN_KEY = "last_children"
-# Reuse the same TTL as the DB layer cache to keep behaviour consistent.
 LAST_CHILDREN_TTL_SECONDS = CACHE_TTL_SECONDS
 
 
@@ -36,7 +38,7 @@ async def _load_children(
     ):
         return cached["children"]
 
-    children_raw = await get_children(kind, ident, user_id)
+    children_raw = await retry(get_children, kind, ident, user_id, logger=logger)
     child_kind = CHILD_KIND.get(kind, kind)
     children = [
         (
@@ -60,20 +62,39 @@ async def _render(
     kind: str,
     ident: Optional[int | str],
     page: int,
+    action: str,
 ) -> None:
-    """Render children for ``kind``/``ident`` at ``page``."""
+    """Render children for ``kind``/``ident`` at ``page`` and log timings."""
 
     user_id = update.effective_user.id if update.effective_user else None
-    children = await _load_children(context, kind, ident, user_id)
 
+    db_start = time.perf_counter()
+    children = await _load_children(context, kind, ident, user_id)
+    db_time = time.perf_counter() - db_start
+
+    render_start = time.perf_counter()
     keyboard = build_children_keyboard(children, page)
     text = NavStack(context.user_data).path_text() or "اختر عنصرًا:"
+    render_time = time.perf_counter() - render_start
 
     if update.callback_query:
         await update.callback_query.answer()
+
+    message_start = time.perf_counter()
+    if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
         await update.message.reply_text(text, reply_markup=keyboard)
+    message_edit_time = time.perf_counter() - message_start
+
+    logger.info(
+        "%s path='%s' db_time=%.3fms render_time=%.3fms message_edit_time=%.3fms",
+        action,
+        NavStack(context.user_data).path_text(),
+        db_time * 1000,
+        render_time * 1000,
+        message_edit_time * 1000,
+    )
 
 
 def _parse_id(value: str) -> int | str:
@@ -81,7 +102,7 @@ def _parse_id(value: str) -> int | str:
 
 
 async def _render_current(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 1
+    update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 1, action: str = "selection"
 ) -> None:
     stack = NavStack(context.user_data)
     node = stack.peek()
@@ -89,7 +110,7 @@ async def _render_current(
         kind, ident = "root", None
     else:
         kind, ident, _ = node
-    await _render(update, context, kind, ident, page)
+    await _render(update, context, kind, ident, page, action)
 
 
 async def navtree_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -98,7 +119,12 @@ async def navtree_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     stack = NavStack(context.user_data)
     while stack.pop():
         pass
-    await _render(update, context, "root", None, 1)
+    try:
+        await _render(update, context, "root", None, 1, action="selection")
+    except Exception:
+        await update.effective_message.reply_text(
+            "عذرًا، حدث خطأ. حاول مرة أخرى لاحقًا.")
+        logger.exception("navtree_start failed")
 
 
 async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -109,17 +135,29 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     stack = NavStack(context.user_data)
 
     if data == "back":
-        stack.pop()
-        await _render_current(update, context, 1)
-        if query:
-            await query.answer()
+        popped = stack.pop()
+        try:
+            await _render_current(update, context, 1, action="pop")
+            if query:
+                await query.answer()
+        except Exception:
+            if popped:
+                stack.push(popped)
+            await (query.message if query else update.message).reply_text(
+                "عذرًا، حدث خطأ وتم الرجوع للمستوى السابق.")
+            logger.exception("Error during pop")
         return
 
     if data.startswith("page:"):
         page = int(data.split(":", 1)[1])
-        await _render_current(update, context, page)
-        if query:
-            await query.answer()
+        try:
+            await _render_current(update, context, page, action="selection")
+            if query:
+                await query.answer()
+        except Exception:
+            await (query.message if query else update.message).reply_text(
+                "عذرًا، تعذر عرض الصفحة المطلوبة.")
+            logger.exception("Error during page selection")
         return
 
     if ":" in data:
@@ -129,17 +167,32 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         parent_kind = parent[0] if parent else "root"
         parent_id = parent[1] if parent else None
         user_id = query.from_user.id if query and query.from_user else None
-        children = await _load_children(context, parent_kind, parent_id, user_id)
+        try:
+            children = await _load_children(context, parent_kind, parent_id, user_id)
+        except Exception:
+            await (query.message if query else update.message).reply_text(
+                "عذرًا، حدث خطأ أثناء جلب البيانات.")
+            logger.exception("Error loading children for selection")
+            return
         label = ""
         for _, item_id, item_label in children:
             if str(item_id) == ident_str:
                 label = item_label
                 break
         stack.push((kind, ident, label))
-        await _render(update, context, kind, ident, 1)
-        if query:
-            await query.answer()
+        try:
+            await _render(update, context, kind, ident, 1, action="push")
+            if query:
+                await query.answer()
+        except Exception:
+            stack.pop()
+            await (query.message if query else update.message).reply_text(
+                "عذرًا، تعذر تحميل العنصر. تم الرجوع للمستوى السابق.")
+            logger.exception("Error during push selection")
         return
 
     if query:
-        await query.answer()
+        try:
+            await query.answer()
+        except Exception:
+            logger.exception("Error answering callback query")
