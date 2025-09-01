@@ -3,13 +3,14 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 
 import logging
 
-from ..config import OWNER_TG_ID
+from ..config import OWNER_TG_ID, config
 from ..db import (
     UPLOAD_CONTENT,
     get_admin_with_permissions,
     insert_ingestion,
     attach_material,
     get_group_id_by_chat,
+    upsert_group,
     get_binding,
     get_or_create_year,
     get_or_create_lecturer,
@@ -126,16 +127,33 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     group_info = await get_group_id_by_chat(chat.id)
     logger.debug("group_info=%s", group_info)
+    auto_registered = False
     if group_info is None:
-        logger.warning("Group info not found for chat %s", chat.id)
-        await send_ephemeral(
-            context,
-            message.chat_id,
-            "المجموعة غير معروفة.",
-            reply_to_message_id=message.message_id,
-            message_thread_id=message.message_thread_id,
-        )
-        return
+        if category in TERM_RESOURCE_TYPES:
+            level_id = getattr(config, "DEFAULT_LEVEL_ID", 1)
+            term_id = getattr(config, "DEFAULT_TERM_ID", 1)
+            await upsert_group(
+                chat.id, level_id, term_id, getattr(chat, "title", "")
+            )
+            group_info = await get_group_id_by_chat(chat.id) or (
+                None,
+                level_id,
+                term_id,
+            )
+            auto_registered = True
+            logger.warning(
+                "Group info not found for chat %s; auto-registered", chat.id
+            )
+        else:
+            logger.warning("Group info not found for chat %s", chat.id)
+            await send_ephemeral(
+                context,
+                message.chat_id,
+                "المجموعة غير معروفة.",
+                reply_to_message_id=message.message_id,
+                message_thread_id=thread_id,
+            )
+            return
     binding = None
     if category not in TERM_RESOURCE_TYPES:
         if thread_id is None:
@@ -177,10 +195,13 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if category in TERM_RESOURCE_TYPES:
         term_id = group_info[2]
         await insert_term_resource(term_id, category, chat.id, message.message_id)
+        confirmation = "✅ تم الاستلام."
+        if auto_registered:
+            confirmation += " تم تسجيل المجموعة تلقائيًا."
         await send_ephemeral(
             context,
             chat.id,
-            "✅ تم الاستلام.",
+            confirmation,
             reply_to_message_id=message.message_id,
             message_thread_id=thread_id,
         )
