@@ -76,7 +76,7 @@ async def _render(
     db_time = time.perf_counter() - db_start
 
     render_start = time.perf_counter()
-    include_back = NavStack(context.user_data).peek() is not None
+    include_back = True
     keyboard = build_children_keyboard(children, page, include_back=include_back)
     text = NavStack(context.user_data).path_text() or "اختر عنصرًا:"
     render_time = time.perf_counter() - render_start
