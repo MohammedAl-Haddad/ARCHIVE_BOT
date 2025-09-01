@@ -78,7 +78,7 @@ def main():
     app.add_handler(approval_callback)
     app.add_handler(duplicate_callback)
     app.add_handler(duplicate_cancel_callback)
-    app.add_handler(CallbackQueryHandler(navtree_callback))
+    app.add_handler(CallbackQueryHandler(navtree_callback, pattern="^nav:"))
     app.add_handler(
         MessageHandler(filters.ALL & filters.ChatType.GROUPS, moderation_handler),
         group=-1,

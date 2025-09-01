@@ -41,20 +41,20 @@ def build_children_keyboard(
     keyboard: list[list[InlineKeyboardButton]] = []
     for kind, ident, label in children[start:end]:
         keyboard.append([
-            InlineKeyboardButton(text=label, callback_data=f"{kind}:{ident}")
+            InlineKeyboardButton(text=label, callback_data=f"nav:{kind}:{ident}")
         ])
 
     nav_row: list[InlineKeyboardButton] = []
     if page > 1:
         nav_row.append(
-            InlineKeyboardButton(text="◀", callback_data=f"page:{page - 1}")
+            InlineKeyboardButton(text="◀", callback_data=f"nav:page:{page - 1}")
         )
     if page < pages:
         nav_row.append(
-            InlineKeyboardButton(text="▶", callback_data=f"page:{page + 1}")
+            InlineKeyboardButton(text="▶", callback_data=f"nav:page:{page + 1}")
         )
     if nav_row:
         keyboard.append(nav_row)
 
-    keyboard.append([InlineKeyboardButton(text="🔙", callback_data="back")])
+    keyboard.append([InlineKeyboardButton(text="🔙", callback_data="nav:back")])
     return InlineKeyboardMarkup(keyboard)
