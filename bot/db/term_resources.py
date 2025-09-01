@@ -1,7 +1,5 @@
 import aiosqlite
-
 from .base import DB_PATH
-
 
 async def insert_term_resource(
     term_id: int,
@@ -20,7 +18,6 @@ async def insert_term_resource(
         await db.commit()
         return cur.lastrowid
 
-
 async def get_latest_term_resource(term_id: int, kind: str):
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
@@ -34,6 +31,13 @@ async def get_latest_term_resource(term_id: int, kind: str):
         )
         return await cur.fetchone()
 
+async def list_term_resource_kinds(term_id: int) -> list[str]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT DISTINCT kind FROM term_resources WHERE term_id=?",
+            (term_id,),
+        )
+        rows = await cur.fetchall()
+        return [row[0] for row in rows]
 
-__all__ = ["insert_term_resource", "get_latest_term_resource"]
-
+__all__ = ["insert_term_resource", "get_latest_term_resource", "list_term_resource_kinds"]

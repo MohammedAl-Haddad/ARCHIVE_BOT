@@ -13,6 +13,7 @@ from ..db import (
     get_lecturers_for_subject_section,
     list_lecture_titles,
     can_view,
+    list_term_resource_kinds,
 )
 
 # ---------------------------------------------------------------------------
@@ -26,6 +27,19 @@ CACHE_TTL_SECONDS = 90  # within the 60-120 second range requested
 
 # cache key -> (timestamp, value)
 _cache: Dict[Tuple[int | None, str, Tuple[Any, ...]], Tuple[float, Any]] = {}
+
+TERM_RESOURCE_LABELS = {
+    "attendance": "جدول الحضور",
+    "study_plan": "الخطة الدراسية",
+}
+
+async def get_term_menu_items(_level_id: int, term_id: int):
+    items = [("subjects", "عرض المواد")]
+    kinds = await list_term_resource_kinds(term_id)
+    for kind in kinds:
+        label = TERM_RESOURCE_LABELS.get(kind, kind)
+        items.append((kind, label))
+    return items
 
 
 def invalidate() -> None:
@@ -49,7 +63,8 @@ Loader = Callable[..., Awaitable[Any]]
 CHILD_KIND: Dict[str, str] = {
     "root": "level",
     "level": "term",
-    "term": "subject",
+    "term": "term_option",
+    "term_option": "subject",
     "subject": "section",
     "section": "year",
     "year": "lecturer",
@@ -119,7 +134,8 @@ class Node:
 KIND_TO_LOADER: Dict[str, Loader] = {
     "root": get_levels,  # top-level -> levels
     "level": get_terms_by_level,
-    "term": get_subjects_by_level_and_term,
+    "term": get_term_menu_items,
+    "term_option": get_subjects_by_level_and_term,
     "subject": get_available_sections_for_subject,
     "section": get_years_for_subject_section,
     "year": get_lecturers_for_subject_section,
