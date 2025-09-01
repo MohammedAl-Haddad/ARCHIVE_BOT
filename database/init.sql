@@ -171,6 +171,7 @@ ON materials(section, created_at);
 -- موارد مرتبطة بالترم (مثل جدول الحضور)
 CREATE TABLE IF NOT EXISTS term_resources (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    level_id INTEGER NOT NULL,
     term_id INTEGER NOT NULL,
     kind TEXT NOT NULL CHECK(kind IN (
         'attendance','study_plan','channels','outcomes','tips',
@@ -179,6 +180,7 @@ CREATE TABLE IF NOT EXISTS term_resources (
     tg_storage_chat_id INTEGER NOT NULL,
     tg_storage_msg_id INTEGER NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (level_id) REFERENCES levels(id),
     FOREIGN KEY (term_id) REFERENCES terms(id)
 );
 
@@ -207,5 +209,5 @@ CREATE TABLE IF NOT EXISTS term_resources (
 -- DROP TABLE term_resources_old;
 -- COMMIT;
 
-CREATE INDEX IF NOT EXISTS idx_term_resources_term_kind
-ON term_resources(term_id, kind);
+CREATE INDEX IF NOT EXISTS idx_term_resources_level_term_kind
+ON term_resources(level_id, term_id, kind);

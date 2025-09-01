@@ -193,8 +193,9 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
 
     if category in TERM_RESOURCE_TYPES:
+        level_id = group_info[1]
         term_id = group_info[2]
-        await insert_term_resource(term_id, category, chat.id, message.message_id)
+        await insert_term_resource(level_id, term_id, category, chat.id, message.message_id)
         confirmation = "✅ تم الاستلام."
         if auto_registered:
             confirmation += " تم تسجيل المجموعة تلقائيًا."

@@ -123,6 +123,33 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         if not await _column_exists(db, "ingestions", col):
             await db.execute(f"ALTER TABLE ingestions ADD COLUMN {col} {col_type}")
 
+    # term_resources level_id column and index
+    if not await _column_exists(db, "term_resources", "level_id"):
+        await db.execute("ALTER TABLE term_resources ADD COLUMN level_id INTEGER")
+        await db.execute(
+            """
+            UPDATE term_resources
+            SET level_id = (
+                SELECT level_id FROM groups
+                WHERE term_id = term_resources.term_id AND level_id IS NOT NULL
+                LIMIT 1
+            )
+            WHERE level_id IS NULL
+            """
+        )
+        await db.execute(
+            "UPDATE term_resources SET level_id = 1 WHERE level_id IS NULL"
+        )
+        await db.execute(
+            "DROP INDEX IF EXISTS idx_term_resources_term_kind"
+        )
+        await db.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_term_resources_level_term_kind
+            ON term_resources(level_id, term_id, kind)
+            """
+        )
+
     # indexes
     await db.execute(
         "CREATE INDEX IF NOT EXISTS idx_materials_core ON materials(subject_id, section, year_id, category)"

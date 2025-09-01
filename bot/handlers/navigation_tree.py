@@ -221,9 +221,11 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 break
         if kind == "term_option":
             if ident_str != "subjects":
-                term_id = parent_id[1] if isinstance(parent_id, tuple) else parent_id
+                level_id, term_id = (
+                    parent_id if isinstance(parent_id, tuple) else (None, parent_id)
+                )
                 try:
-                    res = await get_latest_term_resource(term_id, ident_str)
+                    res = await get_latest_term_resource(level_id, term_id, ident_str)
                     if res:
                         chat_id, msg_id = res
                         target_chat = query.message.chat_id if query else update.effective_chat.id

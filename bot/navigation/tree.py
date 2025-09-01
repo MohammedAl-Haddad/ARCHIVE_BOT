@@ -33,9 +33,9 @@ TERM_RESOURCE_LABELS = {
     "study_plan": "الخطة الدراسية",
 }
 
-async def get_term_menu_items(_level_id: int, term_id: int):
+async def get_term_menu_items(level_id: int, term_id: int):
     items = [("subjects", "عرض المواد")]
-    kinds = await list_term_resource_kinds(term_id)
+    kinds = await list_term_resource_kinds(level_id, term_id)
     for kind in kinds:
         label = TERM_RESOURCE_LABELS.get(kind, kind)
         items.append((kind, label))

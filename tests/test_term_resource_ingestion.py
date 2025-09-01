@@ -21,14 +21,14 @@ def anyio_backend():
 async def test_term_resource_ingestion(kind, tags, monkeypatch):
     calls = []
 
-    async def fake_insert_term_resource(term_id, k, chat_id, msg_id):
-        calls.append((term_id, k, chat_id, msg_id))
+    async def fake_insert_term_resource(level_id, term_id, k, chat_id, msg_id):
+        calls.append((level_id, term_id, k, chat_id, msg_id))
 
     async def fake_get_admin_with_permissions(user_id):
         return (1, ingestion.UPLOAD_CONTENT)
 
     async def fake_get_group_id_by_chat(chat_id):
-        return (None, None, 1)
+        return (None, 1, 1)
 
     async def fake_send_ephemeral(*args, **kwargs):
         return None
@@ -60,15 +60,15 @@ async def test_term_resource_ingestion(kind, tags, monkeypatch):
 
         await ingestion.ingestion_handler(update, context)
 
-        assert calls == [(1, kind, 111, 222)]
+        assert calls == [(1, 1, kind, 111, 222)]
 
 
 async def test_term_resource_unknown_chat_autoregisters(monkeypatch):
     calls = []
     upserts = []
 
-    async def fake_insert_term_resource(term_id, k, chat_id, msg_id):
-        calls.append((term_id, k, chat_id, msg_id))
+    async def fake_insert_term_resource(level_id, term_id, k, chat_id, msg_id):
+        calls.append((level_id, term_id, k, chat_id, msg_id))
 
     async def fake_get_admin_with_permissions(user_id):
         return (1, ingestion.UPLOAD_CONTENT)
@@ -111,4 +111,4 @@ async def test_term_resource_unknown_chat_autoregisters(monkeypatch):
     await ingestion.ingestion_handler(update, context)
 
     assert upserts == [(111, 1, 1, "test")]
-    assert calls == [(1, "attendance", 111, 222)]
+    assert calls == [(1, 1, "attendance", 111, 222)]
