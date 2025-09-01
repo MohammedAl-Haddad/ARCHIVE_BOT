@@ -13,6 +13,7 @@ def build_children_keyboard(
     page: int,
     per_page: int | None = None,
     include_back: bool = True,
+    row_width: int = 2,
 ) -> InlineKeyboardMarkup:
     """Build a paginated inline keyboard for navigation children.
 
@@ -27,6 +28,8 @@ def build_children_keyboard(
         :data:`PER_PAGE` configuration value when ``None``.
     include_back:
         Whether to include a "back" button at the bottom of the keyboard.
+    row_width:
+        Maximum number of child buttons to display in each row.
     """
 
     if per_page is None:
@@ -41,11 +44,20 @@ def build_children_keyboard(
     start = (page - 1) * per_page
     end = start + per_page
 
+    if row_width <= 0:
+        row_width = 1
+
     keyboard: list[list[InlineKeyboardButton]] = []
-    for kind, ident, label in children[start:end]:
-        keyboard.append([
+    row: list[InlineKeyboardButton] = []
+    for idx, (kind, ident, label) in enumerate(children[start:end], start=1):
+        row.append(
             InlineKeyboardButton(text=label, callback_data=f"nav:{kind}:{ident}")
-        ])
+        )
+        if idx % row_width == 0:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
 
     nav_row: list[InlineKeyboardButton] = []
     if page > 1:
