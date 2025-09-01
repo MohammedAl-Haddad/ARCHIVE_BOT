@@ -1,6 +1,7 @@
 import pytest
 
-from bot.parser.hashtags import parse_hashtags, TERM_RESOURCE_ALIASES
+from bot.parser.hashtags import parse_hashtags
+from tests.helpers import TERM_RESOURCE_TAGS
 
 
 def test_parse_hashtags_accepts_full_lecture_sequence():
@@ -21,15 +22,11 @@ def test_parse_hashtags_accepts_full_lecture_sequence():
     assert info.lecturer == "فلان"
 
 
-@pytest.mark.parametrize(
-    "tag, expected",
-    [
-        (f"#{alias}", kind)
-        for kind, aliases in TERM_RESOURCE_ALIASES.items()
-        for alias in aliases
-    ],
-)
-def test_parse_hashtags_term_resources(tag, expected):
-    info, error = parse_hashtags(tag)
-    assert error is None
-    assert info.content_type == expected
+@pytest.mark.parametrize("kind, tags", TERM_RESOURCE_TAGS.items())
+def test_parse_hashtags_term_resources(kind, tags):
+    results = []
+    for tag in tags:
+        info, error = parse_hashtags(tag)
+        assert error is None
+        results.append(info.content_type)
+    assert set(results) == {kind}

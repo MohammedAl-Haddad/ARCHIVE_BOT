@@ -1,8 +1,13 @@
+import os
 import pytest
 from types import SimpleNamespace
 
+os.environ.setdefault("BOT_TOKEN", "x")
+os.environ.setdefault("ARCHIVE_CHANNEL_ID", "1")
+os.environ.setdefault("OWNER_TG_ID", "1")
+
 from bot.handlers import ingestion
-from bot.parser.hashtags import TERM_RESOURCE_ALIASES
+from tests.helpers import TERM_RESOURCE_TAGS
 
 pytestmark = pytest.mark.anyio
 
@@ -12,15 +17,8 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest.mark.parametrize(
-    "tag, kind",
-    [
-        (f"#{alias}", kind)
-        for kind, aliases in TERM_RESOURCE_ALIASES.items()
-        for alias in aliases
-    ],
-)
-async def test_term_resource_ingestion(tag, kind, monkeypatch):
+@pytest.mark.parametrize("kind, tags", TERM_RESOURCE_TAGS.items())
+async def test_term_resource_ingestion(kind, tags, monkeypatch):
     calls = []
 
     async def fake_insert_term_resource(term_id, k, chat_id, msg_id):
@@ -44,20 +42,22 @@ async def test_term_resource_ingestion(tag, kind, monkeypatch):
     monkeypatch.setattr(ingestion, "send_ephemeral", fake_send_ephemeral)
     monkeypatch.setattr(ingestion, "get_file_unique_id_from_message", fake_get_file_unique_id_from_message)
 
-    message = SimpleNamespace(
-        caption=None,
-        text=tag,
-        chat_id=111,
-        message_id=222,
-        message_thread_id=None,
-    )
-    update = SimpleNamespace(
-        effective_message=message,
-        effective_chat=SimpleNamespace(id=111),
-        effective_user=SimpleNamespace(id=42),
-    )
-    context = SimpleNamespace(user_data={})
+    for tag in tags:
+        calls.clear()
+        message = SimpleNamespace(
+            caption=None,
+            text=tag,
+            chat_id=111,
+            message_id=222,
+            message_thread_id=None,
+        )
+        update = SimpleNamespace(
+            effective_message=message,
+            effective_chat=SimpleNamespace(id=111),
+            effective_user=SimpleNamespace(id=42),
+        )
+        context = SimpleNamespace(user_data={})
 
-    await ingestion.ingestion_handler(update, context)
+        await ingestion.ingestion_handler(update, context)
 
-    assert calls == [(1, kind, 111, 222)]
+        assert calls == [(1, kind, 111, 222)]
