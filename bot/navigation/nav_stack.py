@@ -42,6 +42,10 @@ class NavStack:
             return self._stack[-1]
         return None
 
+    def clear(self) -> None:
+        """Remove all nodes from the stack."""
+        self._stack.clear()
+
     # ------------------------------------------------------------------
     def path_text(self) -> str:
         """Return a textual representation of the current path."""

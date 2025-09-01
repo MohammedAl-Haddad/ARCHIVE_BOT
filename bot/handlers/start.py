@@ -2,12 +2,12 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from ..keyboards.builders import build_main_menu
-from ..navigation import NavigationState
+from ..navigation import NavStack
 from bot.db import is_owner, has_perm, MANAGE_ADMINS
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    NavigationState(context.user_data).back_to_levels()
+    NavStack(context.user_data).clear()
     user = update.effective_user
     is_admin = False
     if user:

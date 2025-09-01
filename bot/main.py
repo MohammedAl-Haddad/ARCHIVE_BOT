@@ -1,6 +1,6 @@
 # main.py
 # نقطة الدخول للبوت (وضع Reply Keyboard)
-# يعتمد على NavigationState لإدارة حالة التنقل لكل مستخدم
+# يعتمد على NavStack لإدارة حالة التنقل لكل مستخدم
 
 import os
 import asyncio
