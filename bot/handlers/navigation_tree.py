@@ -12,6 +12,8 @@ from telegram.ext import ContextTypes
 from ..navigation.nav_stack import NavStack
 from ..navigation.tree import get_children, CHILD_KIND, CACHE_TTL_SECONDS
 from ..keyboards.builders.paginated import build_children_keyboard
+from ..keyboards.builders.main_menu import build_main_menu
+from ..db import is_owner, has_perm, MANAGE_ADMINS
 from ..utils.retry import retry
 
 logger = logging.getLogger(__name__)
@@ -73,7 +75,8 @@ async def _render(
     db_time = time.perf_counter() - db_start
 
     render_start = time.perf_counter()
-    keyboard = build_children_keyboard(children, page)
+    include_back = NavStack(context.user_data).peek() is not None
+    keyboard = build_children_keyboard(children, page, include_back=include_back)
     text = NavStack(context.user_data).path_text() or "اختر عنصرًا:"
     render_time = time.perf_counter() - render_start
 
@@ -138,6 +141,26 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if data == "back":
         popped = stack.pop()
+        if not popped:
+            try:
+                user = query.from_user if query else update.effective_user
+                is_admin = False
+                if user:
+                    is_admin = is_owner(user.id) or await has_perm(user.id, MANAGE_ADMINS)
+                if query:
+                    await query.edit_message_text(
+                        "اختر من القائمة:", reply_markup=build_main_menu(is_admin)
+                    )
+                    await query.answer()
+                else:
+                    await update.effective_message.reply_text(
+                        "اختر من القائمة:", reply_markup=build_main_menu(is_admin)
+                    )
+            except Exception:
+                await (query.message if query else update.message).reply_text(
+                    "عذرًا، حدث خطأ أثناء الرجوع للقائمة الرئيسية.")
+                logger.exception("Error returning to main menu")
+            return
         try:
             await _render_current(update, context, 1, action="pop")
             if query:
