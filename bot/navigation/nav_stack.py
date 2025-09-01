@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple, Optional
 NAV_STACK_KEY = "nav_stack"
 
 # Node representation: (kind, id, title)
-Node = Tuple[str, Optional[int | str], str]
+Node = Tuple[str, Optional[int | str | tuple[int, int]], str]
 
 
 class NavStack:
