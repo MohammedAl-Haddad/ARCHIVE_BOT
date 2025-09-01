@@ -32,15 +32,17 @@ SECTION_ALIASES = {
     "مناقشة": "discussion",
     "مناقشه": "discussion",
     "عملي": "lab",
+    "رحلة": "field_trip",
 }
 
 SECTION_LABELS = {
     "theory": "نظري",
     "discussion": "مناقشة",
     "lab": "عملي",
+    "field_trip": "رحلة",
 }
 
-FULL_RE = re.compile(r"^(?P<subject>[^-]+?)\s*-\s*(?P<section>نظري|عملي|مناقشة)\s*$")
+FULL_RE = re.compile(r"^(?P<subject>[^-]+?)\s*-\s*(?P<section>نظري|عملي|مناقشة|مناقشه|رحلة)\s*$")
 NAME_RE = re.compile(r"^(?P<subject>.+?)\s*$")
 
 

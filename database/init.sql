@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS topics (
     group_id INTEGER NOT NULL,
     tg_topic_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
-    section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab')),
+    section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab','field_trip')),
     FOREIGN KEY (group_id) REFERENCES groups(id),
     FOREIGN KEY (subject_id) REFERENCES subjects(id),
     UNIQUE (group_id, tg_topic_id)
@@ -129,7 +129,7 @@ ON ingestions(admin_id);
 CREATE TABLE IF NOT EXISTS materials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     subject_id INTEGER NOT NULL,
-    section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab','syllabus','apps')),
+    section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab','field_trip','syllabus','apps')),
     category TEXT NOT NULL CHECK(category IN (
     'lecture','slides','audio','exam','booklet','board_images','video','simulation',
     'summary','notes','external_link','mind_map','transcript','related'
