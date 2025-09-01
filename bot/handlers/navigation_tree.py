@@ -45,8 +45,12 @@ async def _load_children(
     child_kind = CHILD_KIND.get(kind, kind)
     children = []
     for item in children_raw:
-        item_id = item[0] if isinstance(item, (tuple, list)) else item
-        item_label = item[1] if isinstance(item, (tuple, list)) else str(item)
+        if isinstance(item, (tuple, list)):
+            item_id = item[0]
+            item_label = item[1] if len(item) > 1 else str(item[0])
+        else:
+            item_id = item
+            item_label = str(item)
         if kind == "level" and child_kind == "term":
             item_id = f"{ident}-{item_id}"
         children.append((child_kind, item_id, item_label))
