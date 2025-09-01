@@ -1,6 +1,6 @@
 import pytest
 
-from bot.parser.hashtags import parse_hashtags
+from bot.parser.hashtags import parse_hashtags, TERM_RESOURCE_ALIASES
 
 
 def test_parse_hashtags_accepts_full_lecture_sequence():
@@ -24,16 +24,9 @@ def test_parse_hashtags_accepts_full_lecture_sequence():
 @pytest.mark.parametrize(
     "tag, expected",
     [
-        ("#الخطة_الدراسية", "study_plan"),
-        ("#روابط_القنوات", "channels"),
-        ("#مخرجات_التعلم", "outcomes"),
-        ("#نصائح", "tips"),
-        ("#مشاريع", "projects"),
-        ("#برامج", "programs"),
-        ("#تطبيقات", "apps"),
-        ("#مهارات", "skills"),
-        ("#منتديات", "forums"),
-        ("#مواقع", "sites"),
+        (f"#{alias}", kind)
+        for kind, aliases in TERM_RESOURCE_ALIASES.items()
+        for alias in aliases
     ],
 )
 def test_parse_hashtags_term_resources(tag, expected):
