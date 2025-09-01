@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": 1,
-    "generatedAt": "2025-08-25T22:13:02.912Z"
+    "generatedAt": "2025-09-01T17:10:53.147Z"
   },
   "tree": {
     "name": "ARCHIVE_BOT",
@@ -25,9 +25,18 @@
                 "name": "__init__.py",
                 "path": "bot/config/__init__.py",
                 "kind": "file",
-                "description": "Load configuration values from environment variables.",
-                "sizeBytes": 910,
-                "lines": 37,
+                "description": "Configuration facade: provides `config` object and back-compat globals.",
+                "sizeBytes": 888,
+                "lines": 35,
+                "language": "Python"
+              },
+              {
+                "name": "config.py",
+                "path": "bot/config/config.py",
+                "kind": "file",
+                "description": "bot/config/config.py",
+                "sizeBytes": 2513,
+                "lines": 80,
                 "language": "Python"
               },
               {
@@ -38,6 +47,15 @@
                 "sizeBytes": 94,
                 "lines": 6,
                 "language": "Python"
+              },
+              {
+                "name": "dec.md",
+                "path": "bot/config/dec.md",
+                "kind": "file",
+                "description": "توثيق: bot/config/constants.py",
+                "sizeBytes": 8266,
+                "lines": 187,
+                "language": "Markdown"
               }
             ]
           },
@@ -52,8 +70,8 @@
                 "path": "bot/db/__init__.py",
                 "kind": "file",
                 "description": "Unified DB package with convenient re-exports.",
-                "sizeBytes": 1074,
-                "lines": 38,
+                "sizeBytes": 1086,
+                "lines": 39,
                 "language": "Python"
               },
               {
@@ -79,8 +97,8 @@
                 "path": "bot/db/groups.py",
                 "kind": "file",
                 "description": "INSERT INTO groups (tg_chat_id, title, level_id, term_id) VALUES (?, ?, ?, ?) ON CONFLICT(tg_chat_id) DO UPDATE SET title=excluded.title, level_id=excluded.level_id, term_id=excluded.term_id",
-                "sizeBytes": 998,
-                "lines": 33,
+                "sizeBytes": 1440,
+                "lines": 44,
                 "language": "Python"
               },
               {
@@ -105,9 +123,18 @@
                 "name": "materials.py",
                 "path": "bot/db/materials.py",
                 "kind": "file",
-                "description": "Ensure the ``file_unique_id`` column exists on ``materials`` table.",
-                "sizeBytes": 16867,
-                "lines": 497,
+                "description": "Return title without the \"محاضرة N:\" prefix if present.",
+                "sizeBytes": 19783,
+                "lines": 581,
+                "language": "Python"
+              },
+              {
+                "name": "rbac.py",
+                "path": "bot/db/rbac.py",
+                "kind": "file",
+                "description": "Return True if ``user_id`` may view the item ``kind``/``id``.  The check is performed against the ``admins`` table using the ``tg_user_id`` index.  Currently this function simply verifies that the user exists and is active in the table; callers should handle any further permission logic.",
+                "sizeBytes": 763,
+                "lines": 28,
                 "language": "Python"
               },
               {
@@ -124,8 +151,8 @@
                 "path": "bot/db/subjects.py",
                 "kind": "file",
                 "description": "-----------------------------------------------------------------------------",
-                "sizeBytes": 8123,
-                "lines": 232,
+                "sizeBytes": 9202,
+                "lines": 262,
                 "language": "Python"
               },
               {
@@ -142,8 +169,8 @@
                 "path": "bot/db/topics.py",
                 "kind": "file",
                 "description": "SELECT t.subject_id, s.name, t.section FROM topics t JOIN groups g ON g.id = t.group_id JOIN subjects s ON s.id = t.subject_id WHERE g.tg_chat_id=? AND t.tg_topic_id=?",
-                "sizeBytes": 1903,
-                "lines": 58,
+                "sizeBytes": 2301,
+                "lines": 71,
                 "language": "Python"
               },
               {
@@ -168,8 +195,8 @@
                 "path": "bot/handlers/__init__.py",
                 "kind": "file",
                 "description": "Convenience re-exports for handler callables.",
-                "sizeBytes": 809,
-                "lines": 28,
+                "sizeBytes": 936,
+                "lines": 35,
                 "language": "Python"
               },
               {
@@ -186,8 +213,8 @@
                 "path": "bot/handlers/approvals.py",
                 "kind": "file",
                 "description": "Python source file.",
-                "sizeBytes": 5277,
-                "lines": 138,
+                "sizeBytes": 5764,
+                "lines": 161,
                 "language": "Python"
               },
               {
@@ -195,8 +222,8 @@
                 "path": "bot/handlers/groups.py",
                 "kind": "file",
                 "description": "Python source file.",
-                "sizeBytes": 5360,
-                "lines": 153,
+                "sizeBytes": 5580,
+                "lines": 163,
                 "language": "Python"
               },
               {
@@ -204,8 +231,8 @@
                 "path": "bot/handlers/ingestion.py",
                 "kind": "file",
                 "description": "Python source file.",
-                "sizeBytes": 8799,
-                "lines": 262,
+                "sizeBytes": 14304,
+                "lines": 432,
                 "language": "Python"
               },
               {
@@ -227,11 +254,20 @@
                 "language": "Python"
               },
               {
+                "name": "navigation_tree.py",
+                "path": "bot/handlers/navigation_tree.py",
+                "kind": "file",
+                "description": "Handlers for exploring the navigation tree via inline keyboards.",
+                "sizeBytes": 6666,
+                "lines": 199,
+                "language": "Python"
+              },
+              {
                 "name": "start.py",
                 "path": "bot/handlers/start.py",
                 "kind": "file",
                 "description": "Python source file.",
-                "sizeBytes": 695,
+                "sizeBytes": 672,
                 "lines": 19,
                 "language": "Python"
               },
@@ -240,8 +276,8 @@
                 "path": "bot/handlers/topics.py",
                 "kind": "file",
                 "description": "Python source file.",
-                "sizeBytes": 8454,
-                "lines": 223,
+                "sizeBytes": 8654,
+                "lines": 233,
                 "language": "Python"
               }
             ]
@@ -279,6 +315,32 @@
             "description": "keyboards directory.",
             "children": [
               {
+                "name": "builders",
+                "path": "bot/keyboards/builders",
+                "kind": "dir",
+                "description": "builders directory.",
+                "children": [
+                  {
+                    "name": "__init__.py",
+                    "path": "bot/keyboards/builders/__init__.py",
+                    "kind": "file",
+                    "description": "Python source file.",
+                    "sizeBytes": 10449,
+                    "lines": 298,
+                    "language": "Python"
+                  },
+                  {
+                    "name": "paginated.py",
+                    "path": "bot/keyboards/builders/paginated.py",
+                    "kind": "file",
+                    "description": "Build a paginated inline keyboard for navigation children.  Parameters ---------- children: Sequence of triples ``(kind, id, label)`` describing each child node. page: One-based page number to render. per_page: Number of items to show per page.  Defaults to the global :data:`PER_PAGE` configuration value when ``None``.",
+                    "sizeBytes": 1710,
+                    "lines": 61,
+                    "language": "Python"
+                  }
+                ]
+              },
+              {
                 "name": "__init__.py",
                 "path": "bot/keyboards/__init__.py",
                 "kind": "file",
@@ -295,24 +357,6 @@
                 "sizeBytes": 734,
                 "lines": 23,
                 "language": "Python"
-              },
-              {
-                "name": "builders.py",
-                "path": "bot/keyboards/builders.py",
-                "kind": "file",
-                "description": "Python source file.",
-                "sizeBytes": 9253,
-                "lines": 273,
-                "language": "Python"
-              },
-              {
-                "name": "constants.py",
-                "path": "bot/keyboards/constants.py",
-                "kind": "file",
-                "description": "Python source file.",
-                "sizeBytes": 2783,
-                "lines": 80,
-                "language": "Python"
               }
             ]
           },
@@ -327,10 +371,28 @@
                 "path": "bot/navigation/__init__.py",
                 "kind": "file",
                 "description": "Python source file.",
-                "sizeBytes": 67,
-                "lines": 5,
+                "sizeBytes": 114,
+                "lines": 6,
                 "language": "Python"
               },
+              {
+                "name": "nav_stack.py",
+                "path": "bot/navigation/nav_stack.py",
+                "kind": "file",
+                "description": "Key used to store the navigation stack in ``context.user_data``",
+                "sizeBytes": 1695,
+                "lines": 53,
+                "language": "Python"
+              },
+              {
+                "name": "tree.py",
+                "path": "bot/navigation/tree.py",
+                "kind": "file",
+                "description": "---------------------------------------------------------------------------",
+                "sizeBytes": 4713,
+                "lines": 144,
+                "language": "Python"
+              }
             ]
           },
           {
@@ -343,9 +405,9 @@
                 "name": "__init__.py",
                 "path": "bot/parser/__init__.py",
                 "kind": "file",
-                "description": "Python source file.",
-                "sizeBytes": 0,
-                "lines": 1,
+                "description": "Return the Hijri year found in *text* or ``None`` if absent.  The parser normalises Arabic digits and ignores direction markers. Only years in the range 1300–1600 are considered valid.",
+                "sizeBytes": 792,
+                "lines": 26,
                 "language": "Python"
               },
               {
@@ -353,8 +415,8 @@
                 "path": "bot/parser/hashtags.py",
                 "kind": "file",
                 "description": "Parsing utilities for hashtag based ingestion.  The new ingestion flow relies solely on plain text contained in the caption or message body.  ``telegram`` entities are intentionally ignored so the parsing logic here works with raw text only.  The helpers normalise hidden direction markers, convert Eastern Arabic digits to their Latin representation and then extract structured information from the ordered list of hashtags.  The parser understands a small, fixed set of Arabic hashtags that indicate the *content type* in addition to generic tags for the lecture number, year and lecturer name.  The order of these tags is significant and is validated according to the rules described in :mod:`README`.",
-                "sizeBytes": 8877,
-                "lines": 234,
+                "sizeBytes": 9117,
+                "lines": 241,
                 "language": "Python"
               }
             ]
@@ -388,8 +450,8 @@
                 "path": "bot/utils/formatting.py",
                 "kind": "file",
                 "description": "Return Arabic ordinal word for *n* if known.",
-                "sizeBytes": 709,
-                "lines": 31,
+                "sizeBytes": 1441,
+                "lines": 50,
                 "language": "Python"
               },
               {
@@ -402,12 +464,21 @@
                 "language": "Python"
               },
               {
+                "name": "retry.py",
+                "path": "bot/utils/retry.py",
+                "kind": "file",
+                "description": "Execute ``func`` with retry on failure.  Parameters ---------- func: Callable[..., Awaitable] Asynchronous function to execute. attempts: int Maximum number of attempts before giving up. base_delay: float Initial delay in seconds for exponential backoff. exceptions: Tuple[Type[Exception], ...] Exceptions that trigger a retry. logger: logging.Logger | None Optional logger for warnings.",
+                "sizeBytes": 1178,
+                "lines": 41,
+                "language": "Python"
+              },
+              {
                 "name": "telegram.py",
                 "path": "bot/utils/telegram.py",
                 "kind": "file",
                 "description": "Return a link to a message in the archive channel.  If a public ``username`` is provided, build a public t.me link. Otherwise, fall back to the private ``t.me/c`` format using the internal channel ID. If ``archive_chat_id`` is falsy, ``None`` is returned.",
-                "sizeBytes": 2136,
-                "lines": 71,
+                "sizeBytes": 3047,
+                "lines": 98,
                 "language": "Python"
               }
             ]
@@ -435,7 +506,7 @@
             "path": "bot/main.py",
             "kind": "file",
             "description": "main.py",
-            "sizeBytes": 3511,
+            "sizeBytes": 3579,
             "lines": 122,
             "language": "Python"
           },
@@ -457,20 +528,12 @@
         "description": "Database files.",
         "children": [
           {
-            "name": "archive.db",
-            "path": "database/archive.db",
-            "kind": "file",
-            "description": "File.",
-            "sizeBytes": 159744,
-            "lines": 237
-          },
-          {
             "name": "init.sql",
             "path": "database/init.sql",
             "kind": "file",
             "description": "File.",
-            "sizeBytes": 6103,
-            "lines": 178
+            "sizeBytes": 6263,
+            "lines": 184
           }
         ]
       },
@@ -514,6 +577,15 @@
             "description": "دليل المشرفين",
             "sizeBytes": 2991,
             "lines": 44,
+            "language": "Markdown"
+          },
+          {
+            "name": "navigation_tree_usage.md",
+            "path": "docs/navigation_tree_usage.md",
+            "kind": "file",
+            "description": "استخدام شجرة التنقل",
+            "sizeBytes": 2947,
+            "lines": 59,
             "language": "Markdown"
           },
           {
@@ -620,6 +692,15 @@
             "sizeBytes": 3459,
             "lines": 93,
             "language": "Python"
+          },
+          {
+            "name": "verify_index_usage.py",
+            "path": "scripts/verify_index_usage.py",
+            "kind": "file",
+            "description": "Verify that important queries make use of database indexes.  This script creates an in-memory SQLite database using the schema from ``database/init.sql`` and runs ``EXPLAIN QUERY PLAN`` on a few typical queries.  The output should reference the indexes defined in the schema, confirming they will be used by SQLite.",
+            "sizeBytes": 1671,
+            "lines": 56,
+            "language": "Python"
           }
         ]
       },
@@ -630,23 +711,78 @@
         "description": "Test suite.",
         "children": [
           {
+            "name": "test_duplicate_permissions.py",
+            "path": "tests/test_duplicate_permissions.py",
+            "kind": "file",
+            "description": "Ensure required environment variables for importing bot modules",
+            "sizeBytes": 2686,
+            "lines": 99,
+            "language": "Python"
+          },
+          {
             "name": "test_formatting.py",
             "path": "tests/test_formatting.py",
             "kind": "file",
             "description": "Python source file.",
-            "sizeBytes": 213,
-            "lines": 10,
+            "sizeBytes": 567,
+            "lines": 22,
+            "language": "Python"
+          },
+          {
+            "name": "test_hashtags.py",
+            "path": "tests/test_hashtags.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 538,
+            "lines": 20,
+            "language": "Python"
+          },
+          {
+            "name": "test_last_children_cache.py",
+            "path": "tests/test_last_children_cache.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 1199,
+            "lines": 37,
+            "language": "Python"
+          },
+          {
+            "name": "test_nav_stack.py",
+            "path": "tests/test_nav_stack.py",
+            "kind": "file",
+            "description": "initial stack created under NAV_STACK_KEY",
+            "sizeBytes": 715,
+            "lines": 30,
+            "language": "Python"
+          },
+          {
+            "name": "test_navigation_tree.py",
+            "path": "tests/test_navigation_tree.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 3202,
+            "lines": 111,
+            "language": "Python"
+          },
+          {
+            "name": "test_paginated_keyboard.py",
+            "path": "tests/test_paginated_keyboard.py",
+            "kind": "file",
+            "description": "two items on first page",
+            "sizeBytes": 1191,
+            "lines": 30,
+            "language": "Python"
+          },
+          {
+            "name": "test_parser.py",
+            "path": "tests/test_parser.py",
+            "kind": "file",
+            "description": "Python source file.",
+            "sizeBytes": 300,
+            "lines": 12,
             "language": "Python"
           }
         ]
-      },
-      {
-        "name": ".env.example",
-        "path": ".env.example",
-        "kind": "file",
-        "description": "Telegram channel ID where messages will be archived",
-        "sizeBytes": 161,
-        "lines": 9
       },
       {
         "name": ".gitattributes",
@@ -674,6 +810,15 @@
         "language": "Python"
       },
       {
+        "name": "mechatronics_archive_bot_دليل_تشغيل_ومستند_أمثلة_level_1_ar.md",
+        "path": "mechatronics_archive_bot_دليل_تشغيل_ومستند_أمثلة_level_1_ar.md",
+        "kind": "file",
+        "description": "Mechatronics Archive Bot — دليل التشغيل ومحاكاة الأمثلة (المستوى الأول)",
+        "sizeBytes": 16235,
+        "lines": 407,
+        "language": "Markdown"
+      },
+      {
         "name": "package.json",
         "path": "package.json",
         "kind": "file",
@@ -696,8 +841,8 @@
         "path": "requirements.txt",
         "kind": "file",
         "description": "Text file.",
-        "sizeBytes": 73,
-        "lines": 6,
+        "sizeBytes": 80,
+        "lines": 7,
         "language": "Text"
       },
       {
@@ -707,6 +852,15 @@
         "description": "JSON file.",
         "sizeBytes": 1108,
         "lines": 35,
+        "language": "JSON"
+      },
+      {
+        "name": "structure.json",
+        "path": "structure.json",
+        "kind": "file",
+        "description": "JSON file.",
+        "sizeBytes": 23794,
+        "lines": 715,
         "language": "JSON"
       }
     ]
