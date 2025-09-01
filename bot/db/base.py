@@ -140,15 +140,16 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         await db.execute(
             "UPDATE term_resources SET level_id = 1 WHERE level_id IS NULL"
         )
-        await db.execute(
-            "DROP INDEX IF EXISTS idx_term_resources_term_kind"
-        )
-        await db.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_term_resources_level_term_kind
-            ON term_resources(level_id, term_id, kind)
-            """
-        )
+
+    await db.execute(
+        "DROP INDEX IF EXISTS idx_term_resources_term_kind"
+    )
+    await db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_term_resources_level_term_kind
+        ON term_resources(level_id, term_id, kind)
+        """
+    )
 
     # indexes
     await db.execute(
