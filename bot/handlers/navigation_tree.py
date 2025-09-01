@@ -256,6 +256,31 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 return
             ident = parent_id
         stack.push((kind, ident, label))
+        if kind == "subject":
+            try:
+                sections = await _load_children(context, kind, ident, user_id)
+            except Exception:
+                stack.pop()
+                await (query.message if query else update.message).reply_text(
+                    "عذرًا، حدث خطأ أثناء جلب الأقسام."
+                )
+                logger.exception("Error loading sections for subject")
+                return
+            if len(sections) == 1:
+                section_kind, section_id, section_label = sections[0]
+                stack.push((section_kind, section_id, section_label))
+                try:
+                    await _render(update, context, section_kind, section_id, 1, action="push")
+                    if query:
+                        await query.answer()
+                except Exception:
+                    stack.pop()
+                    stack.pop()
+                    await (query.message if query else update.message).reply_text(
+                        "عذرًا، تعذر تحميل العنصر. تم الرجوع للمستوى السابق."
+                    )
+                    logger.exception("Error during push selection")
+                return
         try:
             await _render(update, context, kind, ident, 1, action="push")
             if query:
@@ -263,7 +288,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         except Exception:
             stack.pop()
             await (query.message if query else update.message).reply_text(
-                "عذرًا، تعذر تحميل العنصر. تم الرجوع للمستوى السابق.")
+                "عذرًا، تعذر تحميل العنصر. تم الرجوع للمستوى السابق."
+            )
             logger.exception("Error during push selection")
         return
 
