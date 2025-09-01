@@ -181,10 +181,30 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 logger.exception("Error returning to main menu")
             return
         try:
+            popped_subject = None
+            if popped and popped[0] == "section":
+                parent = stack.peek()
+                if parent and parent[0] == "subject":
+                    user_id = None
+                    if query and query.from_user:
+                        user_id = query.from_user.id
+                    elif update.effective_user:
+                        user_id = update.effective_user.id
+                    try:
+                        children = await _load_children(
+                            context, "subject", parent[1], user_id
+                        )
+                    except Exception:
+                        children = None
+                    if children is not None and len(children) == 1:
+                        popped_subject = stack.pop()
+
             await _render_current(update, context, 1, action="pop")
             if query:
                 await query.answer()
         except Exception:
+            if popped_subject:
+                stack.push(popped_subject)
             if popped:
                 stack.push(popped)
             await (query.message if query else update.message).reply_text(

@@ -88,6 +88,38 @@ def test_back_button_pops_stack(monkeypatch, navtree):
     render_mock.assert_called_once()
 
 
+def test_back_from_single_section_skips_subject(monkeypatch, navtree):
+    context = SimpleNamespace(user_data={})
+    stack = NavStack(context.user_data)
+    stack.push(("term", 1, "T1"))
+    stack.push(("subject", 7, "S1"))
+    stack.push(("section", "7-only", "Only"))
+
+    query = SimpleNamespace(
+        data="nav:back",
+        message=DummyMessage(),
+        answer=AsyncMock(),
+        from_user=SimpleNamespace(id=1),
+    )
+    update = SimpleNamespace(callback_query=query, effective_user=None)
+
+    async def fake_load_children(ctx, kind, ident, user_id):
+        assert ctx is context
+        if kind == "subject":
+            return [("section", "7-only", "Only")]
+        return []
+
+    monkeypatch.setattr(navtree, "_load_children", fake_load_children)
+
+    render_mock = AsyncMock()
+    monkeypatch.setattr(navtree, "_render_current", render_mock)
+
+    asyncio.run(navtree.navtree_callback(update, context))
+
+    assert stack.path_text() == "T1"
+    render_mock.assert_called_once()
+
+
 def test_root_renders_back_button(monkeypatch, navtree):
     async def fake_get_children(kind, ident, user_id):
         return []
