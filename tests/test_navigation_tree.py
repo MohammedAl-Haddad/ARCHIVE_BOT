@@ -88,6 +88,56 @@ def test_back_button_pops_stack(monkeypatch, navtree):
     render_mock.assert_called_once()
 
 
+def test_root_renders_back_button(monkeypatch, navtree):
+    async def fake_get_children(kind, ident, user_id):
+        return []
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+
+    update = SimpleNamespace(
+        message=DummyMessage(),
+        callback_query=None,
+        effective_user=SimpleNamespace(id=1),
+    )
+    context = SimpleNamespace(user_data={})
+
+    asyncio.run(navtree._render(update, context, "root", None, 1, action="test"))
+
+    _, keyboard = update.message.sent[-1]
+    assert any(
+        button.callback_data == "nav:back"
+        for row in keyboard.inline_keyboard
+        for button in row
+    )
+
+
+def test_back_button_at_root_returns_main_menu(navtree):
+    class DummyQuery:
+        def __init__(self):
+            self.data = "nav:back"
+            self.message = DummyMessage()
+            self.from_user = None
+            self.answered = False
+
+        async def edit_message_text(self, text, reply_markup=None):
+            await self.message.edit_message_text(text, reply_markup)
+
+        async def answer(self):
+            self.answered = True
+
+    query = DummyQuery()
+    update = SimpleNamespace(callback_query=query, effective_user=None)
+    context = SimpleNamespace(user_data={})
+
+    asyncio.run(navtree.navtree_callback(update, context))
+
+    assert query.answered
+    text, reply_markup = query.message.sent[-1]
+    assert text == "اختر من القائمة:"
+    assert reply_markup.inline_keyboard[0][0].callback_data.startswith("menu:")
+    assert NavStack(context.user_data).peek() is None
+
+
 def test_permission_filter(monkeypatch, navtree):
     from bot.navigation import tree as tree_module
 
