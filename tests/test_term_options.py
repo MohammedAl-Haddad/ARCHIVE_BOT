@@ -19,8 +19,8 @@ def test_term_without_resources(monkeypatch, navtree):
     async def _inner():
         from bot.navigation import tree as tree_module
 
-        async def fake_list_term_resource_kinds(term_id: int):
-            assert term_id == 2
+        async def fake_list_term_resource_kinds(level_id: int, term_id: int):
+            assert (level_id, term_id) == (1, 2)
             return []
 
         async def fake_can_view(user_id, kind, item_id):
@@ -41,7 +41,8 @@ def test_term_with_resources(monkeypatch, navtree):
     async def _inner():
         from bot.navigation import tree as tree_module
 
-        async def fake_list_term_resource_kinds(term_id: int):
+        async def fake_list_term_resource_kinds(level_id: int, term_id: int):
+            assert (level_id, term_id) == (1, 2)
             return ["attendance"]
 
         async def fake_can_view(user_id, kind, item_id):
