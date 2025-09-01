@@ -55,6 +55,6 @@ def test_term_with_resources(monkeypatch, navtree):
         ctx = SimpleNamespace(user_data={})
         children = await navtree._load_children(ctx, "term", (1, 2), user_id=1)
         assert ("term_option", "subjects", "عرض المواد") in children
-        assert ("term_option", "attendance", "جدول الحضور") in children
+        assert ("term_option", "attendance", "جدول الحضور 🗓️") in children
 
     asyncio.run(_inner())

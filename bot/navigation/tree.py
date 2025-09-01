@@ -29,8 +29,17 @@ CACHE_TTL_SECONDS = 90  # within the 60-120 second range requested
 _cache: Dict[Tuple[int | None, str, Tuple[Any, ...]], Tuple[float, Any]] = {}
 
 TERM_RESOURCE_LABELS = {
-    "attendance": "جدول الحضور",
-    "study_plan": "الخطة الدراسية",
+    "attendance": "جدول الحضور 🗓️",
+    "study_plan": "الخطة الدراسية 📖",
+    "channels": "روابط القنوات 📎",
+    "outcomes": "مخرجات التعلم 🎯",
+    "tips": "نصائح دراسية 💡",
+    "projects": "أفكار المشاريع 🛠️",
+    "programs": "برامج مقترحة 🖥️",
+    "apps": "تطبيقات مفيدة 📱",
+    "skills": "مهارات مطلوبة 🧠",
+    "forums": "منتديات للنقاش 💬",
+    "sites": "مواقع إلكترونية 🌐",
 }
 
 async def get_term_menu_items(level_id: int, term_id: int):
