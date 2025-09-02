@@ -10,15 +10,7 @@ os.environ.setdefault("OWNER_TG_ID", "1")
 def test_material_tags_hidden_in_term(monkeypatch):
     async def _inner():
         tree_module = import_module("bot.navigation.tree")
-        excluded = [
-            "glossary",
-            "practical",
-            "references",
-            "skills",
-            "open_source_projects",
-            "syllabus",
-            "study_plan",
-        ]
+        excluded = list(tree_module.CATEGORY_SECTIONS)
 
         async def fake_list_term_resource_kinds(level_id, term_id):
             return excluded + ["attendance"]
@@ -26,8 +18,14 @@ def test_material_tags_hidden_in_term(monkeypatch):
         async def fake_has_materials_by_category(subject_id, section, cat):
             return cat in excluded
 
+        async def fake_get_available_sections(subject_id):
+            return ["theory"] + excluded
+
         monkeypatch.setattr(tree_module, "list_term_resource_kinds", fake_list_term_resource_kinds)
         monkeypatch.setattr(tree_module, "has_materials_by_category", fake_has_materials_by_category)
+        monkeypatch.setattr(
+            tree_module, "get_available_sections_for_subject", fake_get_available_sections
+        )
         tree_module.invalidate()
 
         term_items = await tree_module.get_term_menu_items(1, 2)

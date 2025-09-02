@@ -64,6 +64,18 @@ SECTION_CATEGORY_LABELS = {
     "study_plan": "الخطة الدراسية \U0001F4D6",
 }
 
+# Sections that correspond to direct category shortcuts rather than real
+# instructional sections.  These are used to determine whether to display
+# category buttons when only a single real section exists for a subject.
+CATEGORY_SECTIONS = {
+    "syllabus",
+    "glossary",
+    "applications",
+    "references",
+    "skills",
+    "open_source_projects",
+}
+
 async def get_term_menu_items(level_id: int, term_id: int):
     items = [("subjects", "عرض المواد")]
     kinds = await list_term_resource_kinds(level_id, term_id)
@@ -93,9 +105,16 @@ async def get_section_menu_items(subject_id: int, section: str):
     """
 
     items = [("year", "حسب السنة"), ("lecturer", "حسب المحاضر")]
-    for cat, label in SECTION_CATEGORY_LABELS.items():
+
+    sections = await get_available_sections_for_subject(subject_id)
+    real_sections = [s for s in sections if s not in CATEGORY_SECTIONS]
+
+    if len(real_sections) > 1:
+        return items
+
+    for cat in CATEGORY_SECTIONS:
         if await has_materials_by_category(subject_id, section, cat):
-            items.append((cat, label))
+            items.append((cat, SECTION_CATEGORY_LABELS[cat]))
     return items
 
 
@@ -271,4 +290,5 @@ __all__ = [
     "get_children",
     "get_latest_syllabus_material",
     "get_latest_material_by_category",
+    "CATEGORY_SECTIONS",
 ]
