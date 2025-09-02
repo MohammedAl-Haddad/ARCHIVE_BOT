@@ -129,7 +129,10 @@ ON ingestions(admin_id);
 CREATE TABLE IF NOT EXISTS materials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     subject_id INTEGER NOT NULL,
-    section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab','field_trip','syllabus','apps')),
+    section TEXT NOT NULL CHECK(section IN (
+        'theory','discussion','lab','field_trip','syllabus','apps',
+        'vocabulary','references','skills','open_source_projects'
+    )),
     category TEXT NOT NULL CHECK(category IN (
     'lecture','slides','audio','exam','booklet','board_images','video','simulation',
     'summary','notes','external_link','mind_map','transcript','related'

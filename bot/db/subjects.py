@@ -258,7 +258,10 @@ async def get_available_sections_for_subject(subject_id: int) -> list[str]:
             SELECT DISTINCT section
             FROM materials
             WHERE subject_id=?
-              AND section IN ('theory','discussion','lab','field_trip')
+              AND section IN (
+                'theory','discussion','lab','field_trip',
+                'vocabulary','references','skills','open_source_projects'
+              )
               AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
             """,
             (subject_id,),
