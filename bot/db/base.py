@@ -225,7 +225,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         )
 
 
-    if not await _table_has_text(db, "term_resources", "'glossary'"):
+    if await _table_has_text(db, "term_resources", "'glossary'"):
         await db.executescript(
             """
             ALTER TABLE term_resources RENAME TO term_resources_old;
@@ -235,8 +235,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                 term_id INTEGER NOT NULL,
                 kind TEXT NOT NULL CHECK(kind IN (
                     'attendance','study_plan','channels','outcomes','tips',
-                    'projects','programs','apps','skills','forums','sites',
-                    'glossary','practical','references','open_source_projects','misc'
+                    'projects','programs','apps','forums','sites','misc'
                 )),
                 tg_storage_chat_id INTEGER NOT NULL,
                 tg_storage_msg_id INTEGER NOT NULL,
@@ -252,8 +251,28 @@ async def _migrate(db: aiosqlite.Connection) -> None:
             FROM term_resources_old
             WHERE kind IN (
                 'attendance','study_plan','channels','outcomes','tips',
-                'projects','programs','apps','skills','forums','sites',
-                'glossary','practical','references','open_source_projects','misc'
+                'projects','programs','apps','forums','sites','misc'
+            );
+            INSERT INTO materials (
+                subject_id, section, category, title, tg_storage_chat_id, tg_storage_msg_id
+            )
+            SELECT
+                s.id,
+                'theory',
+                tr.kind,
+                CASE tr.kind
+                    WHEN 'glossary' THEN 'المفردات الدراسية'
+                    WHEN 'practical' THEN 'الواقع التطبيقي'
+                    WHEN 'references' THEN 'مراجع'
+                    WHEN 'skills' THEN 'مهارات مطلوبة'
+                    WHEN 'open_source_projects' THEN 'مشاريع مفتوحة المصدر'
+                END,
+                tr.tg_storage_chat_id,
+                tr.tg_storage_msg_id
+            FROM term_resources_old tr
+            JOIN subjects s ON s.level_id = tr.level_id AND s.term_id = tr.term_id
+            WHERE tr.kind IN (
+                'glossary','practical','references','skills','open_source_projects'
             );
             DROP TABLE term_resources_old;
             """

@@ -15,13 +15,8 @@ class TermResourceKind(str, Enum):
     PROJECTS = "projects"
     PROGRAMS = "programs"
     APPS = "apps"
-    SKILLS = "skills"
     FORUMS = "forums"
     SITES = "sites"
-    GLOSSARY = "glossary"
-    PRACTICAL = "practical"
-    REFERENCES = "references"
-    OPEN_SOURCE_PROJECTS = "open_source_projects"
     MISC = "misc"
 
 

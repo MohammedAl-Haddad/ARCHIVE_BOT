@@ -34,13 +34,8 @@ TERM_RESOURCE_TYPES = {
     "projects",
     "programs",
     "apps",
-    "skills",
     "forums",
     "sites",
-    "glossary",
-    "practical",
-    "references",
-    "open_source_projects",
     "misc",
 }
 
