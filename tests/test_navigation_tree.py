@@ -198,6 +198,7 @@ def test_parse_id_handles_composite(navtree):
     assert navtree._parse_id("1-2") == (1, 2)
     assert navtree._parse_id("123-theory") == (123, "theory")
     assert navtree._parse_id("123-field_trip") == (123, "field_trip")
+    assert navtree._parse_id("12-theory-year") == (12, "theory", "year")
 
 
 def test_load_children_merges_level_and_term(monkeypatch, navtree):
@@ -235,6 +236,26 @@ def test_load_children_merges_subject_and_section(monkeypatch, navtree):
         ("section", "7-theory", "نظري 📘"),
         ("section", "7-lab", "عملي 🔬"),
         ("section", "7-field_trip", "رحلة 🚌"),
+    ]
+
+
+def test_load_children_encodes_section_options(monkeypatch, navtree):
+    async def fake_get_children(kind, ident, user_id):
+        assert kind == "section"
+        assert ident == (7, "theory")
+        return [("year", "حسب السنة"), ("lecturer", "حسب المحاضر")]
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+
+    ctx = SimpleNamespace(user_data={})
+
+    async def run():
+        return await navtree._load_children(ctx, "section", (7, "theory"), user_id=None)
+
+    children = asyncio.run(run())
+    assert children == [
+        ("section_option", "7-theory-year", "حسب السنة"),
+        ("section_option", "7-theory-lecturer", "حسب المحاضر"),
     ]
 
 

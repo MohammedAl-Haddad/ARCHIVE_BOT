@@ -51,6 +51,29 @@ async def get_term_menu_items(level_id: int, term_id: int):
     return items
 
 
+async def get_section_menu_items(subject_id: int, section: str):
+    """Return filter options for a subject section.
+
+    Currently exposes filtering by year or by lecturer.
+    """
+
+    return [("year", "حسب السنة"), ("lecturer", "حسب المحاضر")]
+
+
+async def get_section_option_children(subject_id: int, section: str, filter_by: str):
+    """Return children for a section based on ``filter_by``.
+
+    Depending on the selected filter, dispatches to the appropriate loader
+    for years or lecturers.
+    """
+
+    if filter_by == "year":
+        return await get_years_for_subject_section(subject_id, section)
+    if filter_by == "lecturer":
+        return await get_lecturers_for_subject_section(subject_id, section)
+    return []
+
+
 def invalidate() -> None:
     """Clear the cached results.
 
@@ -75,7 +98,8 @@ CHILD_KIND: Dict[str, str] = {
     "term": "term_option",
     "term_option": "subject",
     "subject": "section",
-    "section": "year",
+    "section": "section_option",
+    "section_option": "year",
     "year": "lecturer",
     "lecturer": "lecture",
 }
@@ -125,6 +149,10 @@ class Node:
             result = await loader(*self.args)
 
             child_kind = CHILD_KIND.get(self.kind, self.kind)
+            if self.kind == "section_option" and len(self.args) >= 3:
+                filter_by = self.args[2]
+                if filter_by in ("year", "lecturer"):
+                    child_kind = filter_by
             if isinstance(result, list):
                 filtered = []
                 for item in result:
@@ -146,7 +174,8 @@ KIND_TO_LOADER: Dict[str, Loader] = {
     "term": get_term_menu_items,
     "term_option": get_subjects_by_level_and_term,
     "subject": get_available_sections_for_subject,
-    "section": get_years_for_subject_section,
+    "section": get_section_menu_items,
+    "section_option": get_section_option_children,
     "year": get_lecturers_for_subject_section,
     "lecturer": list_lecture_titles,
 }
