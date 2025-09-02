@@ -43,7 +43,7 @@ def test_term_with_resources(monkeypatch, navtree):
 
         async def fake_list_term_resource_kinds(level_id: int, term_id: int):
             assert (level_id, term_id) == (1, 2)
-            return ["attendance"]
+            return ["attendance", "misc"]
 
         async def fake_can_view(user_id, kind, item_id):
             return True
@@ -56,5 +56,6 @@ def test_term_with_resources(monkeypatch, navtree):
         children = await navtree._load_children(ctx, "term", (1, 2), user_id=1)
         assert ("term_option", "subjects", "عرض المواد") in children
         assert ("term_option", "attendance", "جدول الحضور 🗓️") in children
+        assert ("term_option", "misc", "محتوى متنوع 📦") in children
 
     asyncio.run(_inner())

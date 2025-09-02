@@ -50,6 +50,7 @@ TERM_RESOURCE_LABELS = {
     "practical": "الواقع التطبيقي ⚙️",
     "references": "مراجع 📚",
     "open_source_projects": "مشاريع مفتوحة المصدر 🛠️",
+    "misc": "محتوى متنوع 📦",
 }
 
 YEAR_OPTION_LABELS = {
