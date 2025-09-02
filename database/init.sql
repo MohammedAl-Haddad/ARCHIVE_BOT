@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS materials (
         'vocabulary','references','skills','open_source_projects'
     )),
     category TEXT NOT NULL CHECK(category IN (
-    'lecture','slides','audio','exam','booklet','board_images','video','simulation',
+    'lecture','slides','audio','exam','exam_mid','exam_final','booklet','board_images','video','simulation',
     'summary','notes','external_link','mind_map','transcript','related','syllabus'
     )),
 
