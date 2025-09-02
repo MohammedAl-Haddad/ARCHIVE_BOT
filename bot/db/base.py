@@ -154,7 +154,10 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         )
 
     if (
-        not await _table_has_text(db, "materials", "'open_source_projects'")
+        not await _table_has_text(db, "materials", "'applications'")
+        or not await _table_has_text(db, "materials", "'glossary'")
+        or not await _table_has_text(db, "materials", "'practical'")
+        or not await _table_has_text(db, "materials", "'open_source_projects'")
         or not await _table_has_text(db, "materials", "'syllabus'")
         or not await _table_has_text(db, "materials", "'exam_mid'")
         or not await _table_has_text(db, "materials", "'exam_final'")
@@ -166,12 +169,12 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 subject_id INTEGER NOT NULL,
                 section TEXT NOT NULL CHECK(section IN (
-                    'theory','discussion','lab','field_trip','syllabus','apps',
-                    'vocabulary','references','skills','open_source_projects'
+                    'theory','discussion','lab','field_trip','syllabus','apps'
                 )),
                 category TEXT NOT NULL CHECK(category IN (
                     'lecture','slides','audio','exam','exam_mid','exam_final','booklet','board_images','video','simulation',
-                    'summary','notes','external_link','mind_map','transcript','related','syllabus'
+                    'summary','notes','external_link','mind_map','transcript','related','syllabus',
+                    'vocabulary','applications','references','skills','open_source_projects','glossary','practical'
                 )),
                 title TEXT NOT NULL,
                 url TEXT,
@@ -197,10 +200,32 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                 created_by_admin_id, created_at
             )
             SELECT
-                id, subject_id, section, category, title, url, year_id, lecturer_id,
-                tg_storage_chat_id, tg_storage_msg_id, file_unique_id,
-                source_chat_id, source_topic_id, source_message_id,
-                created_by_admin_id, created_at
+                id,
+                subject_id,
+                CASE
+                    WHEN section IN (
+                        'vocabulary','applications','references','skills','open_source_projects','glossary','practical'
+                    ) THEN 'theory'
+                    ELSE section
+                END AS section,
+                CASE
+                    WHEN section IN (
+                        'vocabulary','applications','references','skills','open_source_projects','glossary','practical'
+                    ) THEN section
+                    ELSE category
+                END AS category,
+                title,
+                url,
+                year_id,
+                lecturer_id,
+                tg_storage_chat_id,
+                tg_storage_msg_id,
+                file_unique_id,
+                source_chat_id,
+                source_topic_id,
+                source_message_id,
+                created_by_admin_id,
+                created_at
             FROM materials_old;
             DROP TABLE materials_old;
             """

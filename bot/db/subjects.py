@@ -259,8 +259,7 @@ async def get_available_sections_for_subject(subject_id: int) -> list[str]:
             FROM materials
             WHERE subject_id=?
               AND section IN (
-                'theory','discussion','lab','field_trip','syllabus',
-                'vocabulary','references','skills','open_source_projects'
+                'theory','discussion','lab','field_trip','syllabus','apps'
               )
               AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
             """,
