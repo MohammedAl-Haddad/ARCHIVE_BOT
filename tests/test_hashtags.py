@@ -30,3 +30,19 @@ def test_parse_hashtags_term_resources(kind, tags):
         assert error is None
         results.append(info.content_type)
     assert set(results) == {kind}
+
+
+@pytest.mark.parametrize(
+    "tag, expected",
+    [
+        ("#نظري", "theory"),
+        ("#مناقشة", "discussion"),
+        ("#مناقشه", "discussion"),
+        ("#عملي", "lab"),
+        ("#رحلة", "field_trip"),
+    ],
+)
+def test_parse_hashtags_section(tag, expected):
+    info, error = parse_hashtags(tag)
+    assert error is None
+    assert info.section == expected
