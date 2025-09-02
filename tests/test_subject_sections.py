@@ -43,7 +43,17 @@ def test_new_sections_returned(tmp_path):
         sections = await subjects.get_available_sections_for_subject(1)
         assert "theory" in sections
         assert "syllabus" in sections
-        for cat in new_categories:
+
+        for cat in [
+            "references",
+            "skills",
+            "open_source_projects",
+            "glossary",
+            "practical",
+        ]:
+            assert cat in sections
+
+        for cat in ["vocabulary", "applications"]:
             assert cat not in sections
 
     asyncio.run(_inner())

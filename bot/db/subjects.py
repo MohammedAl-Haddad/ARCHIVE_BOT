@@ -3,6 +3,15 @@ from dataclasses import dataclass
 
 from .base import DB_PATH
 
+CATEGORY_SECTIONS = {
+    "syllabus",
+    "glossary",
+    "practical",
+    "references",
+    "skills",
+    "open_source_projects",
+}
+
 
 # -----------------------------------------------------------------------------
 # Basic reads for levels/terms/subjects
@@ -268,16 +277,17 @@ async def get_available_sections_for_subject(subject_id: int) -> list[str]:
         rows = await cur.fetchall()
         sections = [r[0] for r in rows]
 
-        cur = await db.execute(
-            """
-            SELECT 1 FROM materials
-            WHERE subject_id=? AND category='syllabus'
-              AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
-            LIMIT 1
-            """,
-            (subject_id,),
-        )
-        if await cur.fetchone() and "syllabus" not in sections:
-            sections.append("syllabus")
+        for category in CATEGORY_SECTIONS:
+            cur = await db.execute(
+                """
+                SELECT 1 FROM materials
+                WHERE subject_id=? AND category=?
+                  AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
+                LIMIT 1
+                """,
+                (subject_id, category),
+            )
+            if await cur.fetchone() and category not in sections:
+                sections.append(category)
 
         return sections
