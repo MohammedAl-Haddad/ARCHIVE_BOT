@@ -132,7 +132,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         if not await _column_exists(db, "ingestions", col):
             await db.execute(f"ALTER TABLE ingestions ADD COLUMN {col} {col_type}")
 
-    # ensure section constraints allow field_trip
+    # ensure section constraints allow additional sections
     if not await _table_has_text(db, "topics", "'field_trip'"):
         await db.executescript(
             """
@@ -153,14 +153,17 @@ async def _migrate(db: aiosqlite.Connection) -> None:
             """
         )
 
-    if not await _table_has_text(db, "materials", "'field_trip'"):
+    if not await _table_has_text(db, "materials", "'open_source_projects'"):
         await db.executescript(
             """
             ALTER TABLE materials RENAME TO materials_old;
             CREATE TABLE materials (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 subject_id INTEGER NOT NULL,
-                section TEXT NOT NULL CHECK(section IN ('theory','discussion','lab','field_trip','syllabus','apps')),
+                section TEXT NOT NULL CHECK(section IN (
+                    'theory','discussion','lab','field_trip','syllabus','apps',
+                    'vocabulary','references','skills','open_source_projects'
+                )),
                 category TEXT NOT NULL CHECK(category IN (
                     'lecture','slides','audio','exam','booklet','board_images','video','simulation',
                     'summary','notes','external_link','mind_map','transcript','related'
