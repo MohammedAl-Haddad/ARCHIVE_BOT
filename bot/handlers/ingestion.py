@@ -41,6 +41,7 @@ TERM_RESOURCE_TYPES = {
     "practical",
     "references",
     "open_source_projects",
+    "misc",
 }
 
 

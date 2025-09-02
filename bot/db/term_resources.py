@@ -22,6 +22,7 @@ class TermResourceKind(str, Enum):
     PRACTICAL = "practical"
     REFERENCES = "references"
     OPEN_SOURCE_PROJECTS = "open_source_projects"
+    MISC = "misc"
 
 
 def _validate_kind(kind: str | TermResourceKind) -> str:

@@ -7,7 +7,7 @@ CREATE TABLE term_resources (
     kind TEXT NOT NULL CHECK(kind IN (
         'attendance','study_plan','channels','outcomes','tips',
         'projects','programs','apps','skills','forums','sites',
-        'glossary','practical','references','open_source_projects'
+        'glossary','practical','references','open_source_projects','misc'
     )),
     tg_storage_chat_id INTEGER NOT NULL,
     tg_storage_msg_id INTEGER NOT NULL,
