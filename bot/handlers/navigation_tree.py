@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-"""Handlers for exploring the navigation tree via inline keyboards."""
+"""Handlers for exploring the navigation tree via inline keyboards.
+
+Navigation flow: level → term → subject → section → filter (year/lecturer) → ….
+"""
 
 from typing import Optional
 import time
@@ -70,9 +73,11 @@ async def _load_children(
         elif kind == "subject" and child_kind == "section":
             item_id = f"{ident}-{item_id}"
         elif kind == "section" and child_kind == "section_option":
+            # After selecting a section, show filter options before listing years/lecturers
             subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
             item_id = f"{subj_id}-{sect}-{item_id}"
         elif kind == "section_option" and child_kind in {"year", "lecturer"}:
+            # Apply the chosen filter to generate year or lecturer nodes
             subj_id, sect, _filt = ident if isinstance(ident, tuple) else (ident, None, None)
             item_id = f"{subj_id}-{sect}-{item_id}"
         if child_kind == "section":
