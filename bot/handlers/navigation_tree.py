@@ -36,7 +36,7 @@ SECTION_LABELS = {
 async def _load_children(
     context: ContextTypes.DEFAULT_TYPE,
     kind: str,
-    ident: Optional[int | str | tuple[int, int | str]],
+    ident: Optional[int | str | tuple[int, int | str] | tuple[int, int | str, str]],
     user_id: int | None,
 ):
     """Return children for ``kind``/``ident`` using a short-lived cache."""
@@ -53,6 +53,10 @@ async def _load_children(
 
     children_raw = await retry(get_children, kind, ident, user_id, logger=logger)
     child_kind = CHILD_KIND.get(kind, kind)
+    if kind == "section_option" and isinstance(ident, tuple) and len(ident) >= 3:
+        filter_by = ident[2]
+        if filter_by in ("year", "lecturer"):
+            child_kind = filter_by
     children = []
     for item in children_raw:
         if isinstance(item, (tuple, list)):
@@ -65,6 +69,12 @@ async def _load_children(
             item_id = f"{ident}-{item_id}"
         elif kind == "subject" and child_kind == "section":
             item_id = f"{ident}-{item_id}"
+        elif kind == "section" and child_kind == "section_option":
+            subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
+            item_id = f"{subj_id}-{sect}-{item_id}"
+        elif kind == "section_option" and child_kind in {"year", "lecturer"}:
+            subj_id, sect, _filt = ident if isinstance(ident, tuple) else (ident, None, None)
+            item_id = f"{subj_id}-{sect}-{item_id}"
         if child_kind == "section":
             item_label = SECTION_LABELS.get(item_label, item_label)
         children.append((child_kind, item_id, item_label))
@@ -80,7 +90,7 @@ async def _render(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     kind: str,
-    ident: Optional[int | str | tuple[int, int | str]],
+    ident: Optional[int | str | tuple[int, int | str] | tuple[int, int | str, str]],
     page: int,
     action: str,
 ) -> None:
@@ -126,13 +136,12 @@ async def _render(
     )
 
 
-def _parse_id(value: str) -> int | tuple[int, int | str] | str:
-    if "-" in value:
-        a, b = value.split("-", 1)
-        a_val = int(a) if a.isdigit() else a
-        b_val = int(b) if b.isdigit() else b
-        return a_val, b_val
-    return int(value) if value.isdigit() else value
+def _parse_id(value: str) -> int | tuple[int, int | str] | tuple[int, int | str, str] | str:
+    parts = value.split("-")
+    parsed = [int(p) if p.isdigit() else p for p in parts]
+    if len(parsed) == 1:
+        return parsed[0]
+    return tuple(parsed)
 
 
 async def _render_current(
@@ -287,6 +296,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     await query.answer()
                 return
             ident = parent_id
+        if kind in {"year", "lecturer"} and isinstance(ident, tuple) and len(ident) >= 3:
+            ident = ident[:2]
         stack.push((kind, ident, label))
         if kind == "subject":
             try:
