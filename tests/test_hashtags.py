@@ -46,3 +46,9 @@ def test_parse_hashtags_section(tag, expected):
     info, error = parse_hashtags(tag)
     assert error is None
     assert info.section == expected
+
+
+def test_parse_hashtags_glossary_new_alias():
+    info, error = parse_hashtags("#المفردات_الدرسية")
+    assert error is None
+    assert info.content_type == "glossary"

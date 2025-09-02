@@ -112,6 +112,7 @@ TERM_RESOURCE_ALIASES = {
     ),
     "glossary": (
         "المفردات_الدراسية",
+        "المفردات_الدرسية",
         "المفردات",
         "study_vocab",
         "glossary",

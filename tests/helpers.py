@@ -11,7 +11,7 @@ from __future__ import annotations
 from bot.parser.hashtags import TERM_RESOURCE_ALIASES
 
 
-# Map each term resource ``kind`` to the four accepted hashtag variants
+# Map each term resource ``kind`` to the accepted hashtag variants
 # prefixed with ``#`` as they would appear in messages.
 TERM_RESOURCE_TAGS = {
     kind: tuple(f"#{alias}" for alias in aliases)
