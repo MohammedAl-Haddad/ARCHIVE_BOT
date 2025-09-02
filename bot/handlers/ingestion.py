@@ -156,22 +156,14 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             return
     binding = None
     if category not in TERM_RESOURCE_TYPES:
-        if thread_id is None:
+        if thread_id is not None:
+            binding = await get_binding(chat.id, thread_id)
+            logger.debug("binding=%s", binding)
+        if thread_id is None or binding is None:
             await send_ephemeral(
                 context,
                 message.chat_id,
-                "هذا النوع يتطلب ربط الـTopic بمادة/قسم عبر /insert_sub.",
-                reply_to_message_id=message.message_id,
-                message_thread_id=message.message_thread_id,
-            )
-            return
-        binding = await get_binding(chat.id, thread_id)
-        logger.debug("binding=%s", binding)
-        if binding is None:
-            await send_ephemeral(
-                context,
-                message.chat_id,
-                "هذا النوع يتطلب ربط الـTopic بمادة/قسم عبر /insert_sub.",
+                "لا يمكن رفع هذا النوع خارج Topic مرتبط بمادة/قسم. استخدم /insert_sub للربط.",
                 reply_to_message_id=message.message_id,
                 message_thread_id=message.message_thread_id,
             )

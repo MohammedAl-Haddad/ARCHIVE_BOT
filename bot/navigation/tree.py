@@ -73,6 +73,7 @@ async def get_term_menu_items(level_id: int, term_id: int):
         "references",
         "skills",
         "open_source_projects",
+        "syllabus",
     }
     kinds = [
         k for k in kinds if k not in excluded and k not in SECTION_CATEGORY_LABELS

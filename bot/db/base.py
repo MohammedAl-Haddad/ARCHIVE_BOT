@@ -291,13 +291,14 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                     WHEN 'references' THEN 'مراجع'
                     WHEN 'skills' THEN 'مهارات مطلوبة'
                     WHEN 'open_source_projects' THEN 'مشاريع مفتوحة المصدر'
+                    WHEN 'syllabus' THEN 'التوصيف'
                 END,
                 tr.tg_storage_chat_id,
                 tr.tg_storage_msg_id
             FROM term_resources_old tr
             JOIN subjects s ON s.level_id = tr.level_id AND s.term_id = tr.term_id
             WHERE tr.kind IN (
-                'glossary','practical','references','skills','open_source_projects'
+                'glossary','practical','references','skills','open_source_projects','syllabus'
             );
             DROP TABLE term_resources_old;
             """
