@@ -52,3 +52,28 @@ def test_parse_hashtags_glossary_new_alias():
     info, error = parse_hashtags("#المفردات_الدرسية")
     assert error is None
     assert info.content_type == "glossary"
+
+
+@pytest.mark.parametrize(
+    "tag, expected",
+    [
+        ("#التوصيف", "syllabus"),
+        ("#المفردات_الدراسية", "glossary"),
+        ("#الواقع_التطبيقي", "practical"),
+        ("#مراجع", "references"),
+        ("#مهارات", "skills"),
+        ("#مشاريع_مفتوحة_المصدر", "open_source_projects"),
+    ],
+    ids=[
+        "التوصيف",
+        "المفردات_الدراسية",
+        "الواقع_التطبيقي",
+        "مراجع",
+        "مهارات",
+        "مشاريع_مفتوحة_المصدر",
+    ],
+)
+def test_parse_hashtags_content_type(tag, expected):
+    info, error = parse_hashtags(tag)
+    assert error is None
+    assert info.content_type == expected
