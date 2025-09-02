@@ -39,7 +39,13 @@ SECTION_LABELS = {
 async def _load_children(
     context: ContextTypes.DEFAULT_TYPE,
     kind: str,
-    ident: Optional[int | str | tuple[int, int | str] | tuple[int, int | str, str]],
+    ident: Optional[
+        int
+        | str
+        | tuple[int, int | str]
+        | tuple[int, int | str, str]
+        | tuple[int, int | str, int, str]
+    ],
     user_id: int | None,
 ):
     """Return children for ``kind``/``ident`` using a short-lived cache."""
@@ -80,6 +86,14 @@ async def _load_children(
             # Apply the chosen filter to generate year or lecturer nodes
             subj_id, sect, _filt = ident if isinstance(ident, tuple) else (ident, None, None)
             item_id = f"{subj_id}-{sect}-{item_id}"
+        elif kind == "year" and child_kind == "year_option":
+            subj_id, sect, year_id = ident if isinstance(ident, tuple) else (ident, None, None)
+            item_id = f"{subj_id}-{sect}-{year_id}-{item_id}"
+        elif kind == "year_option" and child_kind == "lecturer":
+            subj_id, sect, _year_id, _opt = (
+                ident if isinstance(ident, tuple) else (ident, None, None, None)
+            )
+            item_id = f"{subj_id}-{sect}-{item_id}"
         if child_kind == "section":
             item_label = SECTION_LABELS.get(item_label, item_label)
         children.append((child_kind, item_id, item_label))
@@ -95,7 +109,13 @@ async def _render(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     kind: str,
-    ident: Optional[int | str | tuple[int, int | str] | tuple[int, int | str, str]],
+    ident: Optional[
+        int
+        | str
+        | tuple[int, int | str]
+        | tuple[int, int | str, str]
+        | tuple[int, int | str, int, str]
+    ],
     page: int,
     action: str,
 ) -> None:
@@ -108,9 +128,9 @@ async def _render(
     db_time = time.perf_counter() - db_start
 
     render_start = time.perf_counter()
-    include_back = True
-    keyboard = build_children_keyboard(children, page, include_back=include_back)
-    text = NavStack(context.user_data).path_text() or "اختر عنصرًا:"
+    stack = NavStack(context.user_data)
+    keyboard = build_children_keyboard(children, page, include_back=True)
+    text = stack.path_text() or "اختر عنصرًا:"
     render_time = time.perf_counter() - render_start
 
     if update.callback_query:
@@ -301,7 +321,7 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     await query.answer()
                 return
             ident = parent_id
-        if kind in {"year", "lecturer"} and isinstance(ident, tuple) and len(ident) >= 3:
+        if kind == "lecturer" and isinstance(ident, tuple) and len(ident) >= 3:
             ident = ident[:2]
         stack.push((kind, ident, label))
         if kind == "subject":
