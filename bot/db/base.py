@@ -225,7 +225,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         )
 
 
-    if not await _table_has_text(db, "term_resources", "'open_source_projects'"):
+    if not await _table_has_text(db, "term_resources", "'glossary'"):
         await db.executescript(
             """
             ALTER TABLE term_resources RENAME TO term_resources_old;
@@ -236,7 +236,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                 kind TEXT NOT NULL CHECK(kind IN (
                     'attendance','study_plan','channels','outcomes','tips',
                     'projects','programs','apps','skills','forums','sites',
-                    'glossary','practical','references','open_source_projects'
+                    'glossary','practical','references','open_source_projects','misc'
                 )),
                 tg_storage_chat_id INTEGER NOT NULL,
                 tg_storage_msg_id INTEGER NOT NULL,
@@ -253,7 +253,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
             WHERE kind IN (
                 'attendance','study_plan','channels','outcomes','tips',
                 'projects','programs','apps','skills','forums','sites',
-                'glossary','practical','references','open_source_projects'
+                'glossary','practical','references','open_source_projects','misc'
             );
             DROP TABLE term_resources_old;
             """
