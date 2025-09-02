@@ -22,6 +22,16 @@ logger = logging.getLogger(__name__)
 LAST_CHILDREN_KEY = "last_children"
 LAST_CHILDREN_TTL_SECONDS = CACHE_TTL_SECONDS
 
+# Arabic labels with icons for subject sections
+SECTION_LABELS = {
+    "theory": "نظري 📘",
+    "discussion": "مناقشة 💬",
+    "lab": "عملي 🔬",
+    "field_trip": "رحلة 🚌",
+    "syllabus": "التوصيف 📄",
+    "apps": "تطبيقات مفيدة 📱",
+}
+
 
 async def _load_children(
     context: ContextTypes.DEFAULT_TYPE,
@@ -55,6 +65,8 @@ async def _load_children(
             item_id = f"{ident}-{item_id}"
         elif kind == "subject" and child_kind == "section":
             item_id = f"{ident}-{item_id}"
+        if child_kind == "section":
+            item_label = SECTION_LABELS.get(item_label, item_label)
         children.append((child_kind, item_id, item_label))
     context.user_data[LAST_CHILDREN_KEY] = {
         "node_key": node_key,

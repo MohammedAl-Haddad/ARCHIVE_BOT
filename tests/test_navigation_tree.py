@@ -232,10 +232,38 @@ def test_load_children_merges_subject_and_section(monkeypatch, navtree):
 
     children = asyncio.run(run())
     assert children == [
-        ("section", "7-theory", "theory"),
-        ("section", "7-lab", "lab"),
-        ("section", "7-field_trip", "field_trip"),
+        ("section", "7-theory", "نظري 📘"),
+        ("section", "7-lab", "عملي 🔬"),
+        ("section", "7-field_trip", "رحلة 🚌"),
     ]
+
+
+@pytest.mark.parametrize(
+    "section,label",
+    [
+        ("theory", "نظري 📘"),
+        ("discussion", "مناقشة 💬"),
+        ("lab", "عملي 🔬"),
+        ("field_trip", "رحلة 🚌"),
+        ("syllabus", "التوصيف 📄"),
+        ("apps", "تطبيقات مفيدة 📱"),
+    ],
+)
+def test_section_label_translation(monkeypatch, navtree, section, label):
+    async def fake_get_children(kind, ident, user_id):
+        assert kind == "subject"
+        assert ident == 7
+        return [section]
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+
+    ctx = SimpleNamespace(user_data={})
+
+    async def run():
+        return await navtree._load_children(ctx, "subject", 7, user_id=None)
+
+    children = asyncio.run(run())
+    assert children == [("section", f"7-{section}", label)]
 
 
 def test_get_children_accepts_composite(monkeypatch):
