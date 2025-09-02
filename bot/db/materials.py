@@ -420,6 +420,27 @@ async def get_materials_by_category(
         return await cur.fetchall()
 
 
+async def get_latest_syllabus_material(subject_id: int):
+    """Return latest syllabus material for a subject or None.
+
+    The returned tuple is ``(tg_storage_chat_id, tg_storage_msg_id, url)``.
+    """
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """
+            SELECT tg_storage_chat_id, tg_storage_msg_id, url
+            FROM materials
+            WHERE subject_id=? AND category='syllabus'
+              AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (subject_id,),
+        )
+        return await cur.fetchone()
+
+
 async def list_categories_for_subject_section_year(
     subject_id: int,
     section: str,

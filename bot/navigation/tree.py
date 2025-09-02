@@ -17,6 +17,7 @@ from ..db import (
     get_types_for_lecture,
     can_view,
     list_term_resource_kinds,
+    get_latest_syllabus_material,
 )
 
 # ---------------------------------------------------------------------------
@@ -234,4 +235,10 @@ async def get_children(kind: str, id: Any | None = None, user_id: int | None = N
     node = Node(kind, args)
     return await node.children(user_id)
 
-__all__ = ["Node", "invalidate", "KIND_TO_LOADER", "get_children"]
+__all__ = [
+    "Node",
+    "invalidate",
+    "KIND_TO_LOADER",
+    "get_children",
+    "get_latest_syllabus_material",
+]

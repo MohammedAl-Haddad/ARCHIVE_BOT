@@ -14,7 +14,12 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from ..navigation.nav_stack import NavStack
-from ..navigation.tree import get_children, CHILD_KIND, CACHE_TTL_SECONDS
+from ..navigation.tree import (
+    get_children,
+    CHILD_KIND,
+    CACHE_TTL_SECONDS,
+    get_latest_syllabus_material,
+)
 from ..keyboards.builders.paginated import build_children_keyboard
 from ..keyboards.builders.main_menu import build_main_menu
 from ..db import (
@@ -308,6 +313,48 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if str(item_id) == ident_str:
                 label = item_label
                 break
+        if kind == "section":
+            subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
+            if sect == "syllabus":
+                try:
+                    res = await get_latest_syllabus_material(subj_id)
+                    if res:
+                        chat_id, msg_id, url = res
+                        if chat_id and msg_id:
+                            target_chat = (
+                                query.message.chat_id
+                                if query
+                                else update.effective_chat.id
+                            )
+                            thread_id = (
+                                query.message.message_thread_id
+                                if query and query.message
+                                else None
+                            )
+                            await context.bot.copy_message(
+                                chat_id=target_chat,
+                                from_chat_id=chat_id,
+                                message_id=msg_id,
+                                message_thread_id=thread_id,
+                            )
+                        elif url:
+                            await (query.message if query else update.message).reply_text(url)
+                        else:
+                            await (query.message if query else update.message).reply_text(
+                                "المادة غير متاحة بعد.",
+                            )
+                    else:
+                        await (query.message if query else update.message).reply_text(
+                            "المادة غير متاحة بعد.",
+                        )
+                except Exception:
+                    await (query.message if query else update.message).reply_text(
+                        "عذرًا، تعذر جلب المادة.",
+                    )
+                    logger.exception("Error sending syllabus material")
+                if query:
+                    await query.answer()
+                return
         if kind == "lecture_type":
             parent = stack.peek()
             subj_id = sect = year_id = None
