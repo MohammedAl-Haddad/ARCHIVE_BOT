@@ -267,4 +267,18 @@ async def get_available_sections_for_subject(subject_id: int) -> list[str]:
             (subject_id,),
         )
         rows = await cur.fetchall()
-        return [r[0] for r in rows]
+        sections = [r[0] for r in rows]
+
+        cur = await db.execute(
+            """
+            SELECT 1 FROM materials
+            WHERE subject_id=? AND category='syllabus'
+              AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
+            LIMIT 1
+            """,
+            (subject_id,),
+        )
+        if await cur.fetchone() and "syllabus" not in sections:
+            sections.append("syllabus")
+
+        return sections

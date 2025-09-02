@@ -25,8 +25,8 @@ def test_new_sections_returned(tmp_path):
         new_sections = ["vocabulary", "references", "skills", "open_source_projects"]
         for sec in new_sections:
             await materials.insert_material(1, sec, "lecture", f"{sec} title", url="http://ex.com")
-        # Insert a syllabus record and ensure it is returned
-        await materials.insert_material(1, "syllabus", "syllabus", "syllabus title", url="http://ex.com")
+        # Insert a syllabus record with category='syllabus' regardless of section
+        await materials.insert_material(1, "theory", "syllabus", "syllabus title", url="http://ex.com")
         sections = await subjects.get_available_sections_for_subject(1)
         assert set(new_sections).issubset(set(sections))
         assert "syllabus" in sections
