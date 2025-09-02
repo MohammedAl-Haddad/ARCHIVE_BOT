@@ -20,6 +20,7 @@ from ..navigation.tree import (
     CACHE_TTL_SECONDS,
     get_latest_syllabus_material,
     get_latest_material_by_category,
+    SECTION_CATEGORY_LABELS,
 )
 from ..keyboards.builders.paginated import build_children_keyboard
 from ..keyboards.builders.main_menu import build_main_menu
@@ -57,6 +58,8 @@ CATEGORY_OPTIONS = {
     "open_source_projects",
     "practical",
 }
+
+CATEGORY_SECTIONS = set(SECTION_CATEGORY_LABELS.keys())
 
 
 async def _load_children(
@@ -500,8 +503,11 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 )
                 logger.exception("Error loading sections for subject")
                 return
-            if len(sections) == 1:
-                section_kind, section_id, section_label = sections[0]
+            real_sections = [
+                s for s in sections if s[1].split("-", 1)[1] not in CATEGORY_SECTIONS
+            ]
+            if len(real_sections) == 1:
+                section_kind, section_id, section_label = real_sections[0]
                 section_ident = _parse_id(str(section_id))
                 stack.push((section_kind, section_ident, section_label))
                 try:
