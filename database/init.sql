@@ -130,12 +130,12 @@ CREATE TABLE IF NOT EXISTS materials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     subject_id INTEGER NOT NULL,
     section TEXT NOT NULL CHECK(section IN (
-        'theory','discussion','lab','field_trip','syllabus','apps',
-        'vocabulary','references','skills','open_source_projects'
+        'theory','discussion','lab','field_trip','syllabus','apps'
     )),
     category TEXT NOT NULL CHECK(category IN (
     'lecture','slides','audio','exam','exam_mid','exam_final','booklet','board_images','video','simulation',
-    'summary','notes','external_link','mind_map','transcript','related','syllabus'
+    'summary','notes','external_link','mind_map','transcript','related','syllabus',
+    'vocabulary','applications','references','skills','open_source_projects','glossary','practical'
     )),
 
     title TEXT NOT NULL,

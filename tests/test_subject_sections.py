@@ -22,12 +22,28 @@ def test_new_sections_returned(tmp_path):
                 "INSERT INTO subjects (code, name, level_id, term_id) VALUES ('S1','Sub1',1,1)"
             )
             await db.commit()
-        new_sections = ["vocabulary", "references", "skills", "open_source_projects"]
-        for sec in new_sections:
-            await materials.insert_material(1, sec, "lecture", f"{sec} title", url="http://ex.com")
-        # Insert a syllabus record with category='syllabus' regardless of section
-        await materials.insert_material(1, "theory", "syllabus", "syllabus title", url="http://ex.com")
+
+        new_categories = [
+            "vocabulary",
+            "applications",
+            "references",
+            "skills",
+            "open_source_projects",
+            "glossary",
+            "practical",
+        ]
+        for cat in new_categories:
+            await materials.insert_material(
+                1, "theory", cat, f"{cat} title", url="http://ex.com"
+            )
+        # Insert a syllabus record with category='syllabus'
+        await materials.insert_material(
+            1, "theory", "syllabus", "syllabus title", url="http://ex.com"
+        )
         sections = await subjects.get_available_sections_for_subject(1)
-        assert set(new_sections).issubset(set(sections))
+        assert "theory" in sections
         assert "syllabus" in sections
+        for cat in new_categories:
+            assert cat not in sections
+
     asyncio.run(_inner())
