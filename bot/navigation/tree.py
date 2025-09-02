@@ -18,6 +18,8 @@ from ..db import (
     can_view,
     list_term_resource_kinds,
     get_latest_syllabus_material,
+    has_materials_by_category,
+    get_latest_material_by_category,
 )
 
 # ---------------------------------------------------------------------------
@@ -52,6 +54,15 @@ YEAR_OPTION_LABELS = {
     "assignments": "التكاليف 📝",
 }
 
+SECTION_CATEGORY_LABELS = {
+    "syllabus": "التوصيف \U0001F4C4",
+    "vocabulary": "المفردات \U0001F4D6",
+    "applications": "تطبيقات مفيدة \U0001F4F1",
+    "references": "مراجع \U0001F4DA",
+    "skills": "مهارات مطلوبة \U0001F9E0",
+    "open_source_projects": "مشاريع مفتوحة المصدر \U0001F6E0\uFE0F",
+}
+
 async def get_term_menu_items(level_id: int, term_id: int):
     items = [("subjects", "عرض المواد")]
     kinds = await list_term_resource_kinds(level_id, term_id)
@@ -62,12 +73,17 @@ async def get_term_menu_items(level_id: int, term_id: int):
 
 
 async def get_section_menu_items(subject_id: int, section: str):
-    """Return filter options for a subject section.
+    """Return menu items for a subject section.
 
-    Currently exposes filtering by year or by lecturer.
+    Includes filtering options (year/lecturer) and direct category shortcuts
+    when relevant materials exist.
     """
 
-    return [("year", "حسب السنة"), ("lecturer", "حسب المحاضر")]
+    items = [("year", "حسب السنة"), ("lecturer", "حسب المحاضر")]
+    for cat, label in SECTION_CATEGORY_LABELS.items():
+        if await has_materials_by_category(subject_id, section, cat):
+            items.append((cat, label))
+    return items
 
 
 async def get_section_option_children(subject_id: int, section: str, filter_by: str):
@@ -241,4 +257,5 @@ __all__ = [
     "KIND_TO_LOADER",
     "get_children",
     "get_latest_syllabus_material",
+    "get_latest_material_by_category",
 ]
