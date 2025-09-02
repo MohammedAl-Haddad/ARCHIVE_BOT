@@ -17,7 +17,14 @@ from ..navigation.nav_stack import NavStack
 from ..navigation.tree import get_children, CHILD_KIND, CACHE_TTL_SECONDS
 from ..keyboards.builders.paginated import build_children_keyboard
 from ..keyboards.builders.main_menu import build_main_menu
-from ..db import is_owner, has_perm, MANAGE_ADMINS, get_latest_term_resource
+from ..db import (
+    is_owner,
+    has_perm,
+    MANAGE_ADMINS,
+    get_latest_term_resource,
+    get_types_for_lecture,
+    LECTURE_TYPE_LABELS,
+)
 from ..utils.retry import retry
 
 logger = logging.getLogger(__name__)
@@ -66,37 +73,49 @@ async def _load_children(
         filter_by = ident[2]
         if filter_by in ("year", "lecturer"):
             child_kind = filter_by
-    children = []
-    for item in children_raw:
-        if isinstance(item, (tuple, list)):
-            item_id = item[0]
-            item_label = item[1] if len(item) > 1 else str(item[0])
-        else:
-            item_id = item
-            item_label = str(item)
-        if kind == "level" and child_kind == "term":
-            item_id = f"{ident}-{item_id}"
-        elif kind == "subject" and child_kind == "section":
-            item_id = f"{ident}-{item_id}"
-        elif kind == "section" and child_kind == "section_option":
-            # After selecting a section, show filter options before listing years/lecturers
-            subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
-            item_id = f"{subj_id}-{sect}-{item_id}"
-        elif kind == "section_option" and child_kind in {"year", "lecturer"}:
-            # Apply the chosen filter to generate year or lecturer nodes
-            subj_id, sect, _filt = ident if isinstance(ident, tuple) else (ident, None, None)
-            item_id = f"{subj_id}-{sect}-{item_id}"
-        elif kind == "year" and child_kind == "year_option":
-            subj_id, sect, year_id = ident if isinstance(ident, tuple) else (ident, None, None)
-            item_id = f"{subj_id}-{sect}-{year_id}-{item_id}"
-        elif kind == "year_option" and child_kind == "lecturer":
-            subj_id, sect, _year_id, _opt = (
-                ident if isinstance(ident, tuple) else (ident, None, None, None)
-            )
-            item_id = f"{subj_id}-{sect}-{item_id}"
-        if child_kind == "section":
-            item_label = SECTION_LABELS.get(item_label, item_label)
-        children.append((child_kind, item_id, item_label))
+    children: list = []
+    if kind == "lecture" and isinstance(children_raw, dict):
+        for cat in children_raw:
+            label = LECTURE_TYPE_LABELS.get(cat, cat)
+            children.append((child_kind, cat, label))
+    else:
+        for item in children_raw:
+            if (
+                kind == "lecturer"
+                and child_kind == "lecture"
+                and isinstance(item, dict)
+            ):
+                item_id = item.get("lecture_no")
+                item_label = item.get("title", str(item_id))
+            elif isinstance(item, (tuple, list)):
+                item_id = item[0]
+                item_label = item[1] if len(item) > 1 else str(item[0])
+            else:
+                item_id = item
+                item_label = str(item)
+            if kind == "level" and child_kind == "term":
+                item_id = f"{ident}-{item_id}"
+            elif kind == "subject" and child_kind == "section":
+                item_id = f"{ident}-{item_id}"
+            elif kind == "section" and child_kind == "section_option":
+                # After selecting a section, show filter options before listing years/lecturers
+                subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
+                item_id = f"{subj_id}-{sect}-{item_id}"
+            elif kind == "section_option" and child_kind in {"year", "lecturer"}:
+                # Apply the chosen filter to generate year or lecturer nodes
+                subj_id, sect, _filt = ident if isinstance(ident, tuple) else (ident, None, None)
+                item_id = f"{subj_id}-{sect}-{item_id}"
+            elif kind == "year" and child_kind == "year_option":
+                subj_id, sect, year_id = ident if isinstance(ident, tuple) else (ident, None, None)
+                item_id = f"{subj_id}-{sect}-{year_id}-{item_id}"
+            elif kind == "year_option" and child_kind == "lecturer":
+                subj_id, sect, year_id, _opt = (
+                    ident if isinstance(ident, tuple) else (ident, None, None, None)
+                )
+                item_id = f"{subj_id}-{sect}-{item_id}-{year_id}"
+            if child_kind == "section":
+                item_label = SECTION_LABELS.get(item_label, item_label)
+            children.append((child_kind, item_id, item_label))
     context.user_data[LAST_CHILDREN_KEY] = {
         "node_key": node_key,
         "timestamp": now,
@@ -289,6 +308,46 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if str(item_id) == ident_str:
                 label = item_label
                 break
+        if kind == "lecture_type":
+            parent = stack.peek()
+            subj_id = sect = year_id = None
+            lecture_title = ""
+            if parent and parent[0] == "lecture" and isinstance(parent[1], tuple):
+                subj_id, sect, year_id, lecture_title = parent[1]
+            try:
+                types = await get_types_for_lecture(subj_id, sect, year_id, lecture_title)
+                info = types.get(ident)
+                if info:
+                    _id, url, chat_id, msg_id = info
+                    if chat_id and msg_id:
+                        target_chat = query.message.chat_id if query else update.effective_chat.id
+                        thread_id = (
+                            query.message.message_thread_id if query and query.message else None
+                        )
+                        await context.bot.copy_message(
+                            chat_id=target_chat,
+                            from_chat_id=chat_id,
+                            message_id=msg_id,
+                            message_thread_id=thread_id,
+                        )
+                    elif url:
+                        await (query.message if query else update.message).reply_text(url)
+                    else:
+                        await (query.message if query else update.message).reply_text(
+                            "المادة غير متاحة بعد."
+                        )
+                else:
+                    await (query.message if query else update.message).reply_text(
+                        "المادة غير متاحة بعد."
+                    )
+            except Exception:
+                await (query.message if query else update.message).reply_text(
+                    "عذرًا، تعذر جلب المادة."
+                )
+                logger.exception("Error sending lecture material")
+            if query:
+                await query.answer()
+            return
         if kind == "term_option":
             if ident_str != "subjects":
                 level_id, term_id = (
@@ -321,8 +380,13 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     await query.answer()
                 return
             ident = parent_id
-        if kind == "lecturer" and isinstance(ident, tuple) and len(ident) >= 3:
-            ident = ident[:2]
+        if kind == "lecture" and isinstance(ident, int):
+            parent = stack.peek()
+            subj_id = sect = year_id = None
+            if parent and parent[0] == "lecturer" and isinstance(parent[1], tuple):
+                subj_id, sect, _lect_id, year_id = parent[1]
+            lecture_title = f"محاضرة {ident}: {label}"
+            ident = (subj_id, sect, year_id, lecture_title)
         stack.push((kind, ident, label))
         if kind == "subject":
             try:
