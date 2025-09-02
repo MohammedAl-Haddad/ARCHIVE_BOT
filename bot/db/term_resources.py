@@ -8,7 +8,6 @@ class TermResourceKind(str, Enum):
     """Allowed kinds of term resources."""
 
     ATTENDANCE = "attendance"
-    STUDY_PLAN = "study_plan"
     CHANNELS = "channels"
     OUTCOMES = "outcomes"
     TIPS = "tips"

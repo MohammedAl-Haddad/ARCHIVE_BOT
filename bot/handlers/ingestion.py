@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 TERM_RESOURCE_TYPES = {
     "attendance",
-    "study_plan",
     "channels",
     "outcomes",
     "tips",

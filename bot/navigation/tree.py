@@ -36,7 +36,6 @@ _cache: Dict[Tuple[int | None, str, Tuple[Any, ...]], Tuple[float, Any]] = {}
 
 TERM_RESOURCE_LABELS = {
     "attendance": "جدول الحضور 🗓️",
-    "study_plan": "الخطة الدراسية 📖",
     "channels": "روابط القنوات 📎",
     "outcomes": "مخرجات التعلم 🎯",
     "tips": "نصائح دراسية 💡",
@@ -62,6 +61,7 @@ SECTION_CATEGORY_LABELS = {
     "skills": "مهارات مطلوبة \U0001F9E0",
     "open_source_projects": "مشاريع مفتوحة المصدر \U0001F6E0\uFE0F",
     "practical": "الواقع التطبيقي \u2699\uFE0F",
+    "study_plan": "الخطة الدراسية \U0001F4D6",
 }
 
 async def get_term_menu_items(level_id: int, term_id: int):
@@ -74,6 +74,7 @@ async def get_term_menu_items(level_id: int, term_id: int):
         "skills",
         "open_source_projects",
         "syllabus",
+        "study_plan",
     }
     kinds = [
         k for k in kinds if k not in excluded and k not in SECTION_CATEGORY_LABELS
