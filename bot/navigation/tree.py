@@ -43,13 +43,8 @@ TERM_RESOURCE_LABELS = {
     "projects": "أفكار المشاريع 🛠️",
     "programs": "برامج مقترحة 🖥️",
     "apps": "تطبيقات مفيدة 📱",
-    "skills": "مهارات مطلوبة 🧠",
     "forums": "منتديات للنقاش 💬",
     "sites": "مواقع إلكترونية 🌐",
-    "glossary": "المفردات الدراسية 📖",
-    "practical": "الواقع التطبيقي ⚙️",
-    "references": "مراجع 📚",
-    "open_source_projects": "مشاريع مفتوحة المصدر 🛠️",
     "misc": "محتوى متنوع 📦",
 }
 
@@ -72,6 +67,16 @@ SECTION_CATEGORY_LABELS = {
 async def get_term_menu_items(level_id: int, term_id: int):
     items = [("subjects", "عرض المواد")]
     kinds = await list_term_resource_kinds(level_id, term_id)
+    excluded = {
+        "glossary",
+        "practical",
+        "references",
+        "skills",
+        "open_source_projects",
+    }
+    kinds = [
+        k for k in kinds if k not in excluded and k not in SECTION_CATEGORY_LABELS
+    ]
     for kind in kinds:
         label = TERM_RESOURCE_LABELS.get(kind, kind)
         items.append((kind, label))

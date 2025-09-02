@@ -17,7 +17,12 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest.mark.parametrize("kind, tags", TERM_RESOURCE_TAGS.items())
+TERM_ONLY_TAGS = {
+    k: v for k, v in TERM_RESOURCE_TAGS.items() if k in ingestion.TERM_RESOURCE_TYPES
+}
+
+
+@pytest.mark.parametrize("kind, tags", TERM_ONLY_TAGS.items())
 async def test_term_resource_ingestion(kind, tags, monkeypatch):
     calls = []
 
