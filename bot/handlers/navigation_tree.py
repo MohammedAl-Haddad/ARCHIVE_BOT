@@ -50,11 +50,12 @@ SECTION_LABELS = {
 
 CATEGORY_OPTIONS = {
     "syllabus",
-    "vocabulary",
+    "glossary",
     "applications",
     "references",
     "skills",
     "open_source_projects",
+    "practical",
 }
 
 
