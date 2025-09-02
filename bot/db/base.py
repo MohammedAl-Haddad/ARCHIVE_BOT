@@ -153,7 +153,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
             """
         )
 
-    if not await _table_has_text(db, "materials", "'open_source_projects'"):
+    if not await _table_has_text(db, "materials", "'open_source_projects'") or not await _table_has_text(db, "materials", "'syllabus'"):
         await db.executescript(
             """
             ALTER TABLE materials RENAME TO materials_old;
@@ -166,7 +166,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                 )),
                 category TEXT NOT NULL CHECK(category IN (
                     'lecture','slides','audio','exam','booklet','board_images','video','simulation',
-                    'summary','notes','external_link','mind_map','transcript','related'
+                    'summary','notes','external_link','mind_map','transcript','related','syllabus'
                 )),
                 title TEXT NOT NULL,
                 url TEXT,

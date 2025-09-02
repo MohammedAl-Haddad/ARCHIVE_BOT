@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS materials (
     )),
     category TEXT NOT NULL CHECK(category IN (
     'lecture','slides','audio','exam','booklet','board_images','video','simulation',
-    'summary','notes','external_link','mind_map','transcript','related'
+    'summary','notes','external_link','mind_map','transcript','related','syllabus'
     )),
 
     title TEXT NOT NULL,
