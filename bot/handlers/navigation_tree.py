@@ -21,6 +21,7 @@ from ..navigation.tree import (
     get_latest_syllabus_material,
     get_latest_material_by_category,
     SECTION_CATEGORY_LABELS,
+    CATEGORY_SECTIONS,
 )
 from ..keyboards.builders.paginated import build_children_keyboard
 from ..keyboards.builders.main_menu import build_main_menu
@@ -49,17 +50,6 @@ SECTION_LABELS = {
     "apps": "تطبيقات مفيدة 📱",
 }
 
-CATEGORY_OPTIONS = {
-    "syllabus",
-    "glossary",
-    "applications",
-    "references",
-    "skills",
-    "open_source_projects",
-    "practical",
-}
-
-CATEGORY_SECTIONS = set(SECTION_CATEGORY_LABELS.keys())
 
 
 async def _load_children(
@@ -373,7 +363,7 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             subj_id = sect = cat = None
             if isinstance(ident, tuple) and len(ident) >= 3:
                 subj_id, sect, cat = ident
-            if cat in CATEGORY_OPTIONS:
+            if cat in CATEGORY_SECTIONS:
                 try:
                     res = await get_latest_material_by_category(subj_id, sect, cat)
                     if res:
