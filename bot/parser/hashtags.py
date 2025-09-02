@@ -110,6 +110,30 @@ TERM_RESOURCE_ALIASES = {
         "websites",
         "sites",
     ),
+    "glossary": (
+        "المفردات_الدراسية",
+        "المفردات",
+        "study_vocab",
+        "glossary",
+    ),
+    "practical": (
+        "الواقع_التطبيقي",
+        "الواقع",
+        "real_world",
+        "practical",
+    ),
+    "references": (
+        "مراجع",
+        "المرجع",
+        "references",
+        "refs",
+    ),
+    "open_source_projects": (
+        "مشاريع_مفتوحة_المصدر",
+        "مشاريع_مفتوحة",
+        "open_source_projects",
+        "oss_projects",
+    ),
 }
 
 CONTENT_TYPE_ALIASES = {
@@ -127,6 +151,13 @@ CONTENT_TYPE_ALIASES = {
     "video": "video",
     "board_images": "board_images",
     "lecture": "lecture",
+    "summary": "summary",
+    "notes": "notes",
+    "related": "related",
+    "external_link": "external_link",
+    "simulation": "simulation",
+    "mind_map": "mind_map",
+    "transcript": "transcript",
 }
 
 LECTURER_PREFIXES: Tuple[str, ...] = (
@@ -142,6 +173,18 @@ LECTURER_PREFIXES: Tuple[str, ...] = (
 
 ORDINAL_WORDS = {v: k for k, v in ARABIC_ORDINALS.items()}
 
+SECTION_ALIASES = {
+    "نظري": "theory",
+    "مناقشة": "discussion",
+    "مناقشه": "discussion",
+    "عملي": "lab",
+    "رحلة": "field_trip",
+    "theory": "theory",
+    "discussion": "discussion",
+    "lab": "lab",
+    "field_trip": "field_trip",
+}
+
 
 @dataclass
 class ParsedHashtags:
@@ -151,6 +194,7 @@ class ParsedHashtags:
     title: str | None = None
     year: int | None = None
     lecturer: str | None = None
+    section: str | None = None
     tags: List[str] | None = None
 
 
@@ -194,6 +238,12 @@ def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
         if ct and info.content_type is None:
             info.content_type = ct
             sequence.append("content")
+            continue
+
+        # Section tag
+        sect = SECTION_ALIASES.get(token.lstrip("#"))
+        if sect and info.section is None:
+            info.section = sect
             continue
 
         # Year
