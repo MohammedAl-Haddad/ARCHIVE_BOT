@@ -134,6 +134,12 @@ TERM_RESOURCE_ALIASES = {
         "open_source_projects",
         "oss_projects",
     ),
+    "misc": (
+        "محتوى_اخر",
+        "محتوى_آخر",
+        "miscellaneous",
+        "misc",
+    ),
 }
 
 CONTENT_TYPE_ALIASES = {
