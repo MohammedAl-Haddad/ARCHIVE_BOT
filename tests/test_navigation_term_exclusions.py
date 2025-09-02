@@ -17,6 +17,7 @@ def test_material_tags_hidden_in_term(monkeypatch):
             "skills",
             "open_source_projects",
             "syllabus",
+            "study_plan",
         ]
 
         async def fake_list_term_resource_kinds(level_id, term_id):

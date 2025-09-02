@@ -161,6 +161,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         or not await _table_has_text(db, "materials", "'syllabus'")
         or not await _table_has_text(db, "materials", "'exam_mid'")
         or not await _table_has_text(db, "materials", "'exam_final'")
+        or not await _table_has_text(db, "materials", "'study_plan'")
     ):
         await db.executescript(
             """
@@ -174,7 +175,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                 category TEXT NOT NULL CHECK(category IN (
                     'lecture','slides','audio','exam','exam_mid','exam_final','booklet','board_images','video','simulation',
                     'summary','notes','external_link','mind_map','transcript','related','syllabus',
-                    'vocabulary','applications','references','skills','open_source_projects','glossary','practical'
+                    'vocabulary','applications','references','skills','open_source_projects','glossary','practical','study_plan'
                 )),
                 title TEXT NOT NULL,
                 url TEXT,
@@ -250,7 +251,9 @@ async def _migrate(db: aiosqlite.Connection) -> None:
         )
 
 
-    if await _table_has_text(db, "term_resources", "'glossary'"):
+    if await _table_has_text(db, "term_resources", "'glossary'") or await _table_has_text(
+        db, "term_resources", "'study_plan'"
+    ):
         await db.executescript(
             """
             ALTER TABLE term_resources RENAME TO term_resources_old;
@@ -259,7 +262,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                 level_id INTEGER NOT NULL,
                 term_id INTEGER NOT NULL,
                 kind TEXT NOT NULL CHECK(kind IN (
-                    'attendance','study_plan','channels','outcomes','tips',
+                    'attendance','channels','outcomes','tips',
                     'projects','programs','apps','forums','sites','misc'
                 )),
                 tg_storage_chat_id INTEGER NOT NULL,
@@ -275,7 +278,7 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                 id, level_id, term_id, kind, tg_storage_chat_id, tg_storage_msg_id, created_at
             FROM term_resources_old
             WHERE kind IN (
-                'attendance','study_plan','channels','outcomes','tips',
+                'attendance','channels','outcomes','tips',
                 'projects','programs','apps','forums','sites','misc'
             );
             INSERT INTO materials (
@@ -292,13 +295,14 @@ async def _migrate(db: aiosqlite.Connection) -> None:
                     WHEN 'skills' THEN 'مهارات مطلوبة'
                     WHEN 'open_source_projects' THEN 'مشاريع مفتوحة المصدر'
                     WHEN 'syllabus' THEN 'التوصيف'
+                    WHEN 'study_plan' THEN 'الخطة الدراسية'
                 END,
                 tr.tg_storage_chat_id,
                 tr.tg_storage_msg_id
             FROM term_resources_old tr
             JOIN subjects s ON s.level_id = tr.level_id AND s.term_id = tr.term_id
             WHERE tr.kind IN (
-                'glossary','practical','references','skills','open_source_projects','syllabus'
+                'glossary','practical','references','skills','open_source_projects','syllabus','study_plan'
             );
             DROP TABLE term_resources_old;
             """
