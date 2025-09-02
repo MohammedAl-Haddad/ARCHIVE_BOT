@@ -18,6 +18,10 @@ class TermResourceKind(str, Enum):
     SKILLS = "skills"
     FORUMS = "forums"
     SITES = "sites"
+    GLOSSARY = "glossary"
+    PRACTICAL = "practical"
+    REFERENCES = "references"
+    OPEN_SOURCE_PROJECTS = "open_source_projects"
 
 
 def _validate_kind(kind: str | TermResourceKind) -> str:

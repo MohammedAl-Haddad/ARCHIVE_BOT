@@ -46,6 +46,10 @@ TERM_RESOURCE_LABELS = {
     "skills": "مهارات مطلوبة 🧠",
     "forums": "منتديات للنقاش 💬",
     "sites": "مواقع إلكترونية 🌐",
+    "glossary": "المفردات الدراسية 📖",
+    "practical": "الواقع التطبيقي ⚙️",
+    "references": "مراجع 📚",
+    "open_source_projects": "مشاريع مفتوحة المصدر 🛠️",
 }
 
 YEAR_OPTION_LABELS = {
@@ -56,11 +60,12 @@ YEAR_OPTION_LABELS = {
 
 SECTION_CATEGORY_LABELS = {
     "syllabus": "التوصيف \U0001F4C4",
-    "vocabulary": "المفردات \U0001F4D6",
+    "glossary": "المفردات الدراسية \U0001F4D6",
     "applications": "تطبيقات مفيدة \U0001F4F1",
     "references": "مراجع \U0001F4DA",
     "skills": "مهارات مطلوبة \U0001F9E0",
     "open_source_projects": "مشاريع مفتوحة المصدر \U0001F6E0\uFE0F",
+    "practical": "الواقع التطبيقي \u2699\uFE0F",
 }
 
 async def get_term_menu_items(level_id: int, term_id: int):

@@ -224,6 +224,41 @@ async def _migrate(db: aiosqlite.Connection) -> None:
             "UPDATE term_resources SET level_id = 1 WHERE level_id IS NULL"
         )
 
+
+    if not await _table_has_text(db, "term_resources", "'open_source_projects'"):
+        await db.executescript(
+            """
+            ALTER TABLE term_resources RENAME TO term_resources_old;
+            CREATE TABLE term_resources (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                level_id INTEGER NOT NULL,
+                term_id INTEGER NOT NULL,
+                kind TEXT NOT NULL CHECK(kind IN (
+                    'attendance','study_plan','channels','outcomes','tips',
+                    'projects','programs','apps','skills','forums','sites',
+                    'glossary','practical','references','open_source_projects'
+                )),
+                tg_storage_chat_id INTEGER NOT NULL,
+                tg_storage_msg_id INTEGER NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (level_id) REFERENCES levels(id),
+                FOREIGN KEY (term_id) REFERENCES terms(id)
+            );
+            INSERT INTO term_resources (
+                id, level_id, term_id, kind, tg_storage_chat_id, tg_storage_msg_id, created_at
+            )
+            SELECT
+                id, level_id, term_id, kind, tg_storage_chat_id, tg_storage_msg_id, created_at
+            FROM term_resources_old
+            WHERE kind IN (
+                'attendance','study_plan','channels','outcomes','tips',
+                'projects','programs','apps','skills','forums','sites',
+                'glossary','practical','references','open_source_projects'
+            );
+            DROP TABLE term_resources_old;
+            """
+        )
+
     await db.execute(
         "DROP INDEX IF EXISTS idx_term_resources_term_kind"
     )

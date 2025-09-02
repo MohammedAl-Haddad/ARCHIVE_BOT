@@ -16,11 +16,12 @@ from bot.navigation import NavStack
 
 CATEGORIES = [
     ("syllabus", "التوصيف 📄", 9, 99),
-    ("vocabulary", "المفردات 📖", 10, 100),
+    ("glossary", "المفردات الدراسية 📖", 10, 100),
     ("applications", "تطبيقات مفيدة 📱", 11, 101),
     ("references", "مراجع 📚", 12, 102),
     ("skills", "مهارات مطلوبة 🧠", 13, 103),
     ("open_source_projects", "مشاريع مفتوحة المصدر 🛠️", 14, 104),
+    ("practical", "الواقع التطبيقي ⚙️", 15, 105),
 ]
 
 
@@ -50,11 +51,11 @@ def test_section_category_buttons_send_material(tmp_path):
             subject_id INTEGER NOT NULL,
             section TEXT NOT NULL CHECK(section IN (
                 'theory','discussion','lab','field_trip','syllabus','apps',
-                'vocabulary','references','skills','open_source_projects'
+                'vocabulary','references','skills','open_source_projects','glossary','practical'
             )),
             category TEXT NOT NULL CHECK(category IN (
                 'lecture','slides','audio','exam','exam_mid','exam_final','booklet','board_images','video','simulation',
-                'summary','notes','external_link','mind_map','transcript','related','syllabus','vocabulary','applications','references','skills','open_source_projects'
+                'summary','notes','external_link','mind_map','transcript','related','syllabus','vocabulary','applications','references','skills','open_source_projects','glossary','practical'
             )),
             title TEXT NOT NULL,
             url TEXT,
