@@ -11,9 +11,10 @@ from ..db import (
     get_available_sections_for_subject,
     get_years_for_subject_section,
     get_lecturers_for_subject_section,
-    list_lecture_titles,
+    get_lectures_by_lecturer_year,
     list_lecture_titles_by_year,
     list_categories_for_subject_section_year,
+    get_types_for_lecture,
     can_view,
     list_term_resource_kinds,
 )
@@ -137,6 +138,7 @@ CHILD_KIND: Dict[str, str] = {
     "year": "year_option",
     "year_option": "lecturer",
     "lecturer": "lecture",
+    "lecture": "lecture_type",
 }
 
 
@@ -213,7 +215,8 @@ KIND_TO_LOADER: Dict[str, Loader] = {
     "section_option": get_section_option_children,
     "year": get_year_menu_items,
     "year_option": get_year_option_children,
-    "lecturer": list_lecture_titles,
+    "lecturer": get_lectures_by_lecturer_year,
+    "lecture": get_types_for_lecture,
 }
 
 

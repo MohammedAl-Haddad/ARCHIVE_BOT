@@ -3,6 +3,18 @@ import re
 
 from .base import DB_PATH
 
+# Arabic labels for lecture material types used in navigation menus
+LECTURE_TYPE_LABELS = {
+    "lecture": "ملف المحاضرة \U0001F4C4",
+    "slides": "السلايدات \U0001F4D1",
+    "audio": "الصوت \U0001F50A",
+    "board_images": "صور اللوح \U0001F5BC\uFE0F",
+    "video": "الفيديو \U0001F3A5",
+    "mind_map": "الخريطة الذهنية \U0001F5FA\uFE0F",
+    "transcript": "التفريغ \u270D\uFE0F",
+    "related": "مواد مرتبطة \U0001F517",
+}
+
 
 def _strip_lecture_prefix(title: str) -> str:
     """Return title without the "محاضرة N:" prefix if present."""
