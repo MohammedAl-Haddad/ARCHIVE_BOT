@@ -12,6 +12,8 @@ from ..db import (
     get_years_for_subject_section,
     get_lecturers_for_subject_section,
     list_lecture_titles,
+    list_lecture_titles_by_year,
+    list_categories_for_subject_section_year,
     can_view,
     list_term_resource_kinds,
 )
@@ -40,6 +42,12 @@ TERM_RESOURCE_LABELS = {
     "skills": "مهارات مطلوبة 🧠",
     "forums": "منتديات للنقاش 💬",
     "sites": "مواقع إلكترونية 🌐",
+}
+
+YEAR_OPTION_LABELS = {
+    "lectures": "المحاضرات 🎓",
+    "projects": "المشاريع 🛠️",
+    "assignments": "التكاليف 📝",
 }
 
 async def get_term_menu_items(level_id: int, term_id: int):
@@ -74,6 +82,32 @@ async def get_section_option_children(subject_id: int, section: str, filter_by: 
     return []
 
 
+async def get_year_menu_items(subject_id: int, section: str, year_id: int):
+    """Return available material categories for a given year."""
+
+    items = []
+    lectures = await list_lecture_titles_by_year(subject_id, section, year_id)
+    if lectures:
+        items.append(("lectures", YEAR_OPTION_LABELS["lectures"]))
+    categories = await list_categories_for_subject_section_year(
+        subject_id, section, year_id
+    )
+    for cat in categories:
+        label = YEAR_OPTION_LABELS.get(cat, cat)
+        items.append((cat, label))
+    return items
+
+
+async def get_year_option_children(
+    subject_id: int, section: str, year_id: int, option: str
+):
+    """Return children for a year option."""
+
+    if option == "lectures":
+        return await get_lecturers_for_subject_section(subject_id, section)
+    return []
+
+
 def invalidate() -> None:
     """Clear the cached results.
 
@@ -100,7 +134,8 @@ CHILD_KIND: Dict[str, str] = {
     "subject": "section",
     "section": "section_option",
     "section_option": "year",
-    "year": "lecturer",
+    "year": "year_option",
+    "year_option": "lecturer",
     "lecturer": "lecture",
 }
 
@@ -176,7 +211,8 @@ KIND_TO_LOADER: Dict[str, Loader] = {
     "subject": get_available_sections_for_subject,
     "section": get_section_menu_items,
     "section_option": get_section_option_children,
-    "year": get_lecturers_for_subject_section,
+    "year": get_year_menu_items,
+    "year_option": get_year_option_children,
     "lecturer": list_lecture_titles,
 }
 
