@@ -108,8 +108,14 @@ def test_single_section_skips_and_shows_categories(tmp_path):
 
     keyboard = message.sent[-1][1]
     buttons = [b.callback_data for row in keyboard.inline_keyboard for b in row]
+    category_buttons = [
+        b
+        for b in buttons
+        if any(b == f"nav:section_option:1-theory-{cat}" for cat, _label in CATEGORIES)
+    ]
+    assert len(category_buttons) == len(CATEGORIES)
     for cat, _label in CATEGORIES:
-        assert f"nav:section_option:1-theory-{cat}" in buttons
+        assert f"nav:section_option:1-theory-{cat}" in category_buttons
 
 
 def test_multiple_sections_no_skip_and_no_categories(tmp_path):

@@ -23,16 +23,15 @@ def test_new_sections_returned(tmp_path):
             )
             await db.commit()
 
-        new_categories = [
-            "vocabulary",
-            "applications",
+        section_categories = [
             "references",
             "skills",
             "open_source_projects",
             "glossary",
             "practical",
         ]
-        for cat in new_categories:
+        extra_categories = ["vocabulary"]
+        for cat in section_categories + extra_categories:
             await materials.insert_material(
                 1, "theory", cat, f"{cat} title", url="http://ex.com"
             )
@@ -44,16 +43,10 @@ def test_new_sections_returned(tmp_path):
         assert "theory" in sections
         assert "syllabus" in sections
 
-        for cat in [
-            "references",
-            "skills",
-            "open_source_projects",
-            "glossary",
-            "practical",
-        ]:
+        for cat in section_categories:
             assert cat in sections
 
-        for cat in ["vocabulary", "applications"]:
+        for cat in extra_categories:
             assert cat not in sections
 
     asyncio.run(_inner())

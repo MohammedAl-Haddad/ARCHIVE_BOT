@@ -70,6 +70,12 @@ def test_section_category_buttons_send_material(tmp_path):
 
         ctx = SimpleNamespace(user_data={})
         children = await navtree._load_children(ctx, "section", (1, "theory"), user_id=None)
+
+        category_ids = {cat for cat, _label, _chat_id, _msg_id in CATEGORIES}
+        category_children = [
+            c for c in children if c[1].split("-")[-1] in category_ids
+        ]
+        assert len(category_children) == len(CATEGORIES)
         for cat, label, _, _ in CATEGORIES:
             assert ("section_option", f"1-theory-{cat}", label) in children
 
@@ -107,6 +113,8 @@ def test_section_category_buttons_send_material(tmp_path):
                 msg_id,
                 message.message_thread_id,
             )
+
+        assert len(copy_calls) == len(CATEGORIES)
 
     asyncio.run(_inner())
 
