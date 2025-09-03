@@ -56,11 +56,10 @@ YEAR_OPTION_LABELS = {
 SECTION_CATEGORY_LABELS = {
     "syllabus": "التوصيف \U0001F4C4",
     "glossary": "المفردات الدراسية \U0001F4D6",
-    "applications": "تطبيقات مفيدة \U0001F4F1",
-    "references": "مراجع \U0001F4DA",
-    "skills": "مهارات مطلوبة \U0001F9E0",
-    "open_source_projects": "مشاريع مفتوحة المصدر \U0001F6E0\uFE0F",
     "practical": "الواقع التطبيقي \u2699\uFE0F",
+    "references": "مراجع \U0001F4DA",
+    "skills": "مهارات \U0001F9E0",
+    "open_source_projects": "مشاريع مفتوحة المصدر \U0001F6E0\uFE0F",
     "study_plan": "الخطة الدراسية \U0001F4D6",
 }
 
@@ -70,7 +69,7 @@ SECTION_CATEGORY_LABELS = {
 CATEGORY_SECTIONS = {
     "syllabus",
     "glossary",
-    "applications",
+    "practical",
     "references",
     "skills",
     "open_source_projects",

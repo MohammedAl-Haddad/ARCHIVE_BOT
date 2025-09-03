@@ -267,7 +267,11 @@ def test_load_children_encodes_section_options(monkeypatch, navtree):
         ("lab", "عملي 🔬"),
         ("field_trip", "رحلة 🚌"),
         ("syllabus", "التوصيف 📄"),
-        ("apps", "تطبيقات مفيدة 📱"),
+        ("glossary", "المفردات الدراسية 📖"),
+        ("practical", "الواقع التطبيقي ⚙️"),
+        ("references", "مراجع 📚"),
+        ("skills", "مهارات 🧠"),
+        ("open_source_projects", "مشاريع مفتوحة المصدر 🛠️"),
     ],
 )
 def test_section_label_translation(monkeypatch, navtree, section, label):
