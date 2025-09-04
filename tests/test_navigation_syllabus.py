@@ -47,7 +47,7 @@ def test_syllabus_section_sends_material(tmp_path):
             1, "lab", "lecture", "l", tg_storage_chat_id=1, tg_storage_msg_id=12
         )
         await materials.insert_material(
-            1, "theory", "syllabus", "sy", tg_storage_chat_id=9, tg_storage_msg_id=99
+            1, "discussion", "syllabus", "sy", tg_storage_chat_id=9, tg_storage_msg_id=99
         )
 
         navtree = import_module("bot.handlers.navigation_tree")

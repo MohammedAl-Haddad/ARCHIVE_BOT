@@ -9,6 +9,7 @@ from ..db import (
     get_terms_by_level,
     get_subjects_by_level_and_term,
     get_available_sections_for_subject,
+    get_available_cards_for_subject,
     get_years_for_subject_section,
     get_lecturers_for_subject_section,
     get_lectures_by_lecturer_year,
@@ -74,6 +75,12 @@ CATEGORY_SECTIONS = {
     "skills",
     "open_source_projects",
 }
+
+async def get_sections_and_cards_for_subject(subject_id: int) -> list[str]:
+    """Return available sections and cards for a subject."""
+    sections = await get_available_sections_for_subject(subject_id)
+    cards = await get_available_cards_for_subject(subject_id)
+    return sections + cards
 
 async def get_term_menu_items(level_id: int, term_id: int):
     items = [("subjects", "عرض المواد")]
@@ -258,7 +265,7 @@ KIND_TO_LOADER: Dict[str, Loader] = {
     "level": get_terms_by_level,
     "term": get_term_menu_items,
     "term_option": get_subjects_by_level_and_term,
-    "subject": get_available_sections_for_subject,
+    "subject": get_sections_and_cards_for_subject,
     "section": get_section_menu_items,
     "section_option": get_section_option_children,
     "year": get_year_menu_items,

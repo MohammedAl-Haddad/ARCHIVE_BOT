@@ -40,13 +40,12 @@ def test_new_sections_returned(tmp_path):
             1, "theory", "syllabus", "syllabus title", url="http://ex.com"
         )
         sections = await subjects.get_available_sections_for_subject(1)
-        assert "theory" in sections
-        assert "syllabus" in sections
+        assert sections == ["theory"]
 
-        for cat in section_categories:
-            assert cat in sections
-
+        cards = await subjects.get_available_cards_for_subject(1)
+        for cat in section_categories + ["syllabus"]:
+            assert cat in cards
         for cat in extra_categories:
-            assert cat not in sections
+            assert cat not in cards
 
     asyncio.run(_inner())
