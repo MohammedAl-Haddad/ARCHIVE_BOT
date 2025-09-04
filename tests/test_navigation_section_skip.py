@@ -110,9 +110,11 @@ def test_single_section_does_not_skip(tmp_path):
 
     keyboard = message.sent[-1][1]
     buttons = [b.callback_data for row in keyboard.inline_keyboard for b in row]
-    assert "nav:sec:1-theory" in buttons
+    assert "nav:section_option:1-theory-year" in buttons
+    assert "nav:section_option:1-theory-lecturer" in buttons
+    assert "nav:sec:1-theory" not in buttons
     for cat, _label in CATEGORIES:
-        assert f"nav:section_option:1-theory-{cat}" not in buttons
+        assert f"nav:card:1-{cat}" in buttons
 
 
 def test_multiple_sections_no_skip_and_no_categories(tmp_path):

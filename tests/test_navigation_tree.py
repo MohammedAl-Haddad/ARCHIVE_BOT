@@ -270,6 +270,9 @@ def test_section_label_translation(monkeypatch, navtree, section, label):
     async def fake_get_children(kind, ident, user_id):
         assert kind == "subject"
         assert ident == 7
+        if section in navtree.SECTION_LABELS:
+            extra = "lab" if section != "lab" else "theory"
+            return [section, extra]
         return [section]
 
     monkeypatch.setattr(navtree, "get_children", fake_get_children)
@@ -280,8 +283,52 @@ def test_section_label_translation(monkeypatch, navtree, section, label):
         return await navtree._load_children(ctx, "subject", 7, user_id=None)
 
     children = asyncio.run(run())
-    expected_kind = "sec" if section in {"theory", "discussion", "lab", "field_trip"} else "card"
-    assert children == [(expected_kind, f"7-{section}", label)]
+    expected_kind = "sec" if section in navtree.SECTION_LABELS else "card"
+    assert (expected_kind, f"7-{section}", label) in children
+
+
+def test_subject_multi_section_layout(monkeypatch, navtree):
+    async def fake_get_children(kind, ident, user_id):
+        assert kind == "subject"
+        assert ident == 7
+        return ["theory", "lab", "syllabus", "glossary"]
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+
+    ctx = SimpleNamespace(user_data={})
+
+    async def run():
+        return await navtree._load_children(ctx, "subject", 7, user_id=None)
+
+    children = asyncio.run(run())
+    assert children == [
+        ("sec", "7-theory", navtree.SECTION_LABELS["theory"]),
+        ("sec", "7-lab", navtree.SECTION_LABELS["lab"]),
+        ("card", "7-syllabus", navtree.CARD_LABELS["syllabus"]),
+        ("card", "7-glossary", navtree.CARD_LABELS["glossary"]),
+    ]
+
+
+def test_subject_single_section_layout(monkeypatch, navtree):
+    async def fake_get_children(kind, ident, user_id):
+        assert kind == "subject"
+        assert ident == 7
+        return ["theory", "syllabus", "glossary"]
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+
+    ctx = SimpleNamespace(user_data={})
+
+    async def run():
+        return await navtree._load_children(ctx, "subject", 7, user_id=None)
+
+    children = asyncio.run(run())
+    assert children == [
+        ("section_option", "7-theory-year", "حسب السنة"),
+        ("section_option", "7-theory-lecturer", "حسب المحاضر"),
+        ("card", "7-syllabus", navtree.CARD_LABELS["syllabus"]),
+        ("card", "7-glossary", navtree.CARD_LABELS["glossary"]),
+    ]
 
 
 def test_get_children_accepts_composite(monkeypatch):

@@ -58,6 +58,12 @@ CARD_LABELS = {
     "open_source_projects": "مشاريع مفتوحة المصدر 🛠️",
 }
 
+# Labels for filter options used when a subject has a single section
+FILTER_LABELS = {
+    "year": "حسب السنة",
+    "lecturer": "حسب المحاضر",
+}
+
 
 
 async def _load_children(
@@ -95,6 +101,31 @@ async def _load_children(
         for cat in children_raw:
             label = LECTURE_TYPE_LABELS.get(cat, cat)
             children.append((child_kind, cat, label))
+    elif kind == "subject" and child_kind == "section" and isinstance(children_raw, list):
+        sections = [s for s in SECTION_LABELS if s in children_raw]
+        cards = [c for c in CARD_LABELS if c in children_raw]
+        if len(sections) > 1:
+            for sect in sections:
+                item_id = f"{ident}-{sect}"
+                children.append(("sec", item_id, SECTION_LABELS[sect]))
+            if "syllabus" in cards:
+                children.append(("card", f"{ident}-syllabus", CARD_LABELS["syllabus"]))
+                cards.remove("syllabus")
+            for card in cards:
+                children.append(("card", f"{ident}-{card}", CARD_LABELS[card]))
+        elif len(sections) == 1:
+            sect = sections[0]
+            for filt in ("year", "lecturer"):
+                item_id = f"{ident}-{sect}-{filt}"
+                children.append(("section_option", item_id, FILTER_LABELS[filt]))
+            if "syllabus" in cards:
+                children.append(("card", f"{ident}-syllabus", CARD_LABELS["syllabus"]))
+                cards.remove("syllabus")
+            for card in cards:
+                children.append(("card", f"{ident}-{card}", CARD_LABELS[card]))
+        else:
+            for card in cards:
+                children.append(("card", f"{ident}-{card}", CARD_LABELS[card]))
     else:
         for item in children_raw:
             if (
@@ -112,15 +143,6 @@ async def _load_children(
                 item_label = str(item)
             if kind == "level" and child_kind == "term":
                 item_id = f"{ident}-{item_id}"
-            elif kind == "subject" and child_kind == "section":
-                original_id = item_id
-                item_id = f"{ident}-{original_id}"
-                node_kind = "card" if original_id in CARD_LABELS else "sec"
-                item_label = SECTION_LABELS.get(
-                    original_id, CARD_LABELS.get(original_id, original_id)
-                )
-                children.append((node_kind, item_id, item_label))
-                continue
             elif kind == "section" and child_kind == "section_option":
                 # After selecting a section, show filter options before listing years/lecturers
                 subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
