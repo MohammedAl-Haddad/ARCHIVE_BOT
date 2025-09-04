@@ -193,6 +193,47 @@ SECTION_ALIASES = {
 }
 
 
+# Hashtags that represent resource cards and sections.  The parser exposes a
+# small helper to classify a single hashtag into one of these categories so
+# calling code can quickly determine the intended destination for a piece of
+# content.
+
+CARD_TAGS = {
+    "#التوصيف": "syllabus",
+    "#المفردات_الدراسية": "glossary",
+    "#الواقع_التطبيقي": "practical",
+    "#المراجع": "references",
+    "#مهارات": "skills",
+    "#مشاريع_مفتوحة_المصدر": "open_source_projects",
+}
+
+SECTION_TAGS = {
+    "#نظري": "theory",
+    "#عملي": "lab",
+    "#مناقشة": "discussion",
+    "#ميداني": "field_trip",
+}
+
+
+def classify_hashtag(tag: str) -> Tuple[str | None, str | None]:
+    """Return ``("card", code)`` or ``("sec", code)`` for known hashtags.
+
+    ``tag`` should include the leading ``#``.  If *tag* does not correspond to a
+    known card or section hashtag ``(None, None)`` is returned.
+    """
+
+    token = tag.strip()
+    code = CARD_TAGS.get(token)
+    if code is not None:
+        return "card", code
+
+    code = SECTION_TAGS.get(token)
+    if code is not None:
+        return "sec", code
+
+    return None, None
+
+
 @dataclass
 class ParsedHashtags:
     content_type: str | None = None
@@ -368,5 +409,12 @@ def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
     return info, None
 
 
-__all__ = ["parse_hashtags", "ParsedHashtags", "TERM_RESOURCE_ALIASES"]
+__all__ = [
+    "parse_hashtags",
+    "ParsedHashtags",
+    "TERM_RESOURCE_ALIASES",
+    "CARD_TAGS",
+    "SECTION_TAGS",
+    "classify_hashtag",
+]
 
