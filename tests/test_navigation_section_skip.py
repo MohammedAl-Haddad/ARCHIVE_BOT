@@ -110,7 +110,7 @@ def test_single_section_does_not_skip(tmp_path):
 
     keyboard = message.sent[-1][1]
     buttons = [b.callback_data for row in keyboard.inline_keyboard for b in row]
-    assert "nav:section:1-theory" in buttons
+    assert "nav:sec:1-theory" in buttons
     for cat, _label in CATEGORIES:
         assert f"nav:section_option:1-theory-{cat}" not in buttons
 
@@ -141,10 +141,10 @@ def test_multiple_sections_no_skip_and_no_categories(tmp_path):
 
     keyboard = message.sent[-1][1]
     buttons = [b.callback_data for row in keyboard.inline_keyboard for b in row]
-    assert "nav:section:1-theory" in buttons
-    assert "nav:section:1-lab" in buttons
+    assert "nav:sec:1-theory" in buttons
+    assert "nav:sec:1-lab" in buttons
     query2 = SimpleNamespace(
-        data="nav:section:1-theory",
+        data="nav:sec:1-theory",
         message=message,
         answer=AsyncMock(),
         from_user=None,

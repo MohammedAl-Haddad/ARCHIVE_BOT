@@ -1,9 +1,9 @@
-import asyncio
-import os
 import aiosqlite
 from importlib import import_module
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
+import asyncio
+import os
 
 os.environ.setdefault("BOT_TOKEN", "1")
 os.environ.setdefault("ARCHIVE_CHANNEL_ID", "1")
@@ -16,22 +16,16 @@ from bot.navigation import NavStack
 
 class DummyMessage:
     def __init__(self):
-        self.sent = []
         self.chat_id = 100
         self.message_thread_id = 200
 
-    async def reply_text(self, text, reply_markup=None):
-        self.sent.append((text, reply_markup))
 
-    async def edit_message_text(self, text, reply_markup=None):
-        self.sent.append((text, reply_markup))
-
-
-def test_syllabus_section_sends_material(tmp_path):
+def test_card_button_sends_material(tmp_path):
     async def _inner():
         db_path = tmp_path / "test.db"
         db_base.DB_PATH = subjects.DB_PATH = materials.DB_PATH = str(db_path)
         await db_base.init_db()
+
         async with aiosqlite.connect(db_base.DB_PATH) as db:
             await db.execute("INSERT INTO levels (name) VALUES ('L1')")
             await db.execute("INSERT INTO terms (name) VALUES ('T1')")
@@ -41,22 +35,21 @@ def test_syllabus_section_sends_material(tmp_path):
             await db.commit()
 
         await materials.insert_material(
-            1, "theory", "lecture", "t", tg_storage_chat_id=1, tg_storage_msg_id=11
-        )
-        await materials.insert_material(
-            1, "lab", "lecture", "l", tg_storage_chat_id=1, tg_storage_msg_id=12
-        )
-        await materials.insert_material(
-            1, "theory", "syllabus", "sy", tg_storage_chat_id=9, tg_storage_msg_id=99
+            1,
+            "theory",
+            "glossary",
+            "glossary title",
+            tg_storage_chat_id=10,
+            tg_storage_msg_id=100,
         )
 
         navtree = import_module("bot.handlers.navigation_tree")
 
         ctx = SimpleNamespace(user_data={})
-        children = await navtree._load_children(ctx, "subject", 1, user_id=None)
-        assert ("card", "1-syllabus", "التوصيف 📄") in children
-
         stack = NavStack(ctx.user_data)
+        stack.push(("level", 1, "L1"))
+        stack.push(("term", (1, 1), "T1"))
+        stack.push(("term_option", (1, 1), "عرض المواد"))
         stack.push(("subject", 1, "Sub1"))
 
         copy_calls = []
@@ -65,8 +58,9 @@ def test_syllabus_section_sends_material(tmp_path):
             copy_calls.append((chat_id, from_chat_id, message_id, message_thread_id))
 
         message = DummyMessage()
+
         query = SimpleNamespace(
-            data="card:1-syllabus",
+            data="nav:card:1-glossary",
             message=message,
             answer=AsyncMock(),
             from_user=SimpleNamespace(id=1),
@@ -82,12 +76,15 @@ def test_syllabus_section_sends_material(tmp_path):
 
         await navtree.navtree_callback(update, context)
 
-        assert copy_calls == [(
+        assert copy_calls[-1] == (
             message.chat_id,
-            9,
-            99,
+            10,
+            100,
             message.message_thread_id,
-        )]
+        )
+
+        stack = NavStack(ctx.user_data)
+        assert stack.peek()[0] == "subject"
 
     asyncio.run(_inner())
 

@@ -225,9 +225,9 @@ def test_load_children_merges_subject_and_section(monkeypatch, navtree):
 
     children = asyncio.run(run())
     assert children == [
-        ("section", "7-theory", "نظري 📘"),
-        ("section", "7-lab", "عملي 🔬"),
-        ("section", "7-field_trip", "رحلة 🚌"),
+        ("sec", "7-theory", "نظري 📘"),
+        ("sec", "7-lab", "عملي 🔬"),
+        ("sec", "7-field_trip", "رحلة 🚌"),
     ]
 
 
@@ -280,7 +280,8 @@ def test_section_label_translation(monkeypatch, navtree, section, label):
         return await navtree._load_children(ctx, "subject", 7, user_id=None)
 
     children = asyncio.run(run())
-    assert children == [("section", f"7-{section}", label)]
+    expected_kind = "sec" if section in {"theory", "discussion", "lab", "field_trip"} else "card"
+    assert children == [(expected_kind, f"7-{section}", label)]
 
 
 def test_get_children_accepts_composite(monkeypatch):
