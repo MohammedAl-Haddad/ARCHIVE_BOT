@@ -81,7 +81,7 @@ def _build_initial_stack(ctx):
     return stack
 
 
-def test_single_section_skips_and_shows_categories(tmp_path):
+def test_single_section_does_not_skip(tmp_path):
     _setup_db(tmp_path, with_lab=False)
     navtree = import_module("bot.handlers.navigation_tree")
     from bot.navigation.tree import invalidate
@@ -98,24 +98,21 @@ def test_single_section_skips_and_shows_categories(tmp_path):
         edit_message_text=message.edit_message_text,
     )
     update = SimpleNamespace(callback_query=query, effective_user=None)
-    context = SimpleNamespace(user_data=ctx.user_data, bot=SimpleNamespace(copy_message=AsyncMock()))
+    context = SimpleNamespace(
+        user_data=ctx.user_data,
+        bot=SimpleNamespace(copy_message=AsyncMock()),
+    )
 
     asyncio.run(navtree.navtree_callback(update, context))
 
     stack = NavStack(ctx.user_data)
-    assert stack.peek()[0] == "section"
-    assert stack.peek()[1] == (1, "theory")
+    assert stack.peek()[0] == "subject"
 
     keyboard = message.sent[-1][1]
     buttons = [b.callback_data for row in keyboard.inline_keyboard for b in row]
-    category_buttons = [
-        b
-        for b in buttons
-        if any(b == f"nav:section_option:1-theory-{cat}" for cat, _label in CATEGORIES)
-    ]
-    assert len(category_buttons) == len(CATEGORIES)
+    assert "nav:section:1-theory" in buttons
     for cat, _label in CATEGORIES:
-        assert f"nav:section_option:1-theory-{cat}" in category_buttons
+        assert f"nav:section_option:1-theory-{cat}" not in buttons
 
 
 def test_multiple_sections_no_skip_and_no_categories(tmp_path):

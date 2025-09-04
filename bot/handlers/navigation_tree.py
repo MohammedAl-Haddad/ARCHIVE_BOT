@@ -265,30 +265,10 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 logger.exception("Error returning to main menu")
             return
         try:
-            popped_subject = None
-            if popped and popped[0] == "section":
-                parent = stack.peek()
-                if parent and parent[0] == "subject":
-                    user_id = None
-                    if query and query.from_user:
-                        user_id = query.from_user.id
-                    elif update.effective_user:
-                        user_id = update.effective_user.id
-                    try:
-                        children = await _load_children(
-                            context, "subject", parent[1], user_id
-                        )
-                    except Exception:
-                        children = None
-                    if children is not None and len(children) == 1:
-                        popped_subject = stack.pop()
-
             await _render_current(update, context, 1, action="pop")
             if query:
                 await query.answer()
         except Exception:
-            if popped_subject:
-                stack.push(popped_subject)
             if popped:
                 stack.push(popped)
             await (query.message if query else update.message).reply_text(
@@ -493,35 +473,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             lecture_title = f"محاضرة {ident}: {label}"
             ident = (subj_id, sect, year_id, lecture_title)
         stack.push((kind, ident, label))
-        if kind == "subject":
-            try:
-                sections = await _load_children(context, kind, ident, user_id)
-            except Exception:
-                stack.pop()
-                await (query.message if query else update.message).reply_text(
-                    "عذرًا، حدث خطأ أثناء جلب الأقسام."
-                )
-                logger.exception("Error loading sections for subject")
-                return
-            real_sections = [
-                s for s in sections if s[1].split("-", 1)[1] not in CATEGORY_SECTIONS
-            ]
-            if len(real_sections) == 1:
-                section_kind, section_id, section_label = real_sections[0]
-                section_ident = _parse_id(str(section_id))
-                stack.push((section_kind, section_ident, section_label))
-                try:
-                    await _render(update, context, section_kind, section_ident, 1, action="push")
-                    if query:
-                        await query.answer()
-                except Exception:
-                    stack.pop()
-                    stack.pop()
-                    await (query.message if query else update.message).reply_text(
-                        "عذرًا، تعذر تحميل العنصر. تم الرجوع للمستوى السابق."
-                    )
-                    logger.exception("Error during push selection")
-                return
+        # Auto-skip for single-section subjects is disabled to always show the
+        # first-level menu.
         try:
             await _render(update, context, kind, ident, 1, action="push")
             if query:
