@@ -113,7 +113,14 @@ async def _load_children(
             if kind == "level" and child_kind == "term":
                 item_id = f"{ident}-{item_id}"
             elif kind == "subject" and child_kind == "section":
-                item_id = f"{ident}-{item_id}"
+                original_id = item_id
+                item_id = f"{ident}-{original_id}"
+                node_kind = "card" if original_id in CARD_LABELS else "sec"
+                item_label = SECTION_LABELS.get(
+                    original_id, CARD_LABELS.get(original_id, original_id)
+                )
+                children.append((node_kind, item_id, item_label))
+                continue
             elif kind == "section" and child_kind == "section_option":
                 # After selecting a section, show filter options before listing years/lecturers
                 subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
@@ -288,6 +295,56 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             logger.exception("Error during page selection")
         return
 
+    if data.startswith("card:"):
+        ident_str = data.split(":", 1)[1]
+        try:
+            subj_part, card_code = ident_str.split("-", 1)
+            subj_id = int(subj_part)
+        except Exception:
+            subj_id = None
+            card_code = ""
+        try:
+            if card_code == "syllabus":
+                res = await get_latest_syllabus_material(subj_id)
+            else:
+                res = await get_latest_material_by_category(subj_id, "theory", card_code)
+            if res:
+                chat_id, msg_id, url = res
+                if chat_id and msg_id:
+                    target_chat = (
+                        query.message.chat_id if query else update.effective_chat.id
+                    )
+                    thread_id = (
+                        query.message.message_thread_id if query and query.message else None
+                    )
+                    await context.bot.copy_message(
+                        chat_id=target_chat,
+                        from_chat_id=chat_id,
+                        message_id=msg_id,
+                        message_thread_id=thread_id,
+                    )
+                elif url:
+                    await (query.message if query else update.message).reply_text(url)
+                else:
+                    await (query.message if query else update.message).reply_text(
+                        "المادة غير متاحة بعد.",
+                    )
+            else:
+                await (query.message if query else update.message).reply_text(
+                    "المادة غير متاحة بعد.",
+                )
+        except Exception:
+            await (query.message if query else update.message).reply_text(
+                "عذرًا، تعذر جلب المادة.",
+            )
+            logger.exception("Error sending card material")
+        if query:
+            await query.answer()
+        return
+
+    if data.startswith("sec:"):
+        data = f"section:{data.split(':', 1)[1]}"
+
     if ":" in data:
         kind, ident_str = data.split(":", 1)
         ident = _parse_id(ident_str)
@@ -307,48 +364,6 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if str(item_id) == ident_str:
                 label = item_label
                 break
-        if kind == "section":
-            subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
-            if sect == "syllabus":
-                try:
-                    res = await get_latest_syllabus_material(subj_id)
-                    if res:
-                        chat_id, msg_id, url = res
-                        if chat_id and msg_id:
-                            target_chat = (
-                                query.message.chat_id
-                                if query
-                                else update.effective_chat.id
-                            )
-                            thread_id = (
-                                query.message.message_thread_id
-                                if query and query.message
-                                else None
-                            )
-                            await context.bot.copy_message(
-                                chat_id=target_chat,
-                                from_chat_id=chat_id,
-                                message_id=msg_id,
-                                message_thread_id=thread_id,
-                            )
-                        elif url:
-                            await (query.message if query else update.message).reply_text(url)
-                        else:
-                            await (query.message if query else update.message).reply_text(
-                                "المادة غير متاحة بعد.",
-                            )
-                    else:
-                        await (query.message if query else update.message).reply_text(
-                            "المادة غير متاحة بعد.",
-                        )
-                except Exception:
-                    await (query.message if query else update.message).reply_text(
-                        "عذرًا، تعذر جلب المادة.",
-                    )
-                    logger.exception("Error sending syllabus material")
-                if query:
-                    await query.answer()
-                return
         if kind == "section_option":
             subj_id = sect = cat = None
             if isinstance(ident, tuple) and len(ident) >= 3:
