@@ -60,7 +60,7 @@ def test_card_button_sends_material(tmp_path):
         message = DummyMessage()
 
         query = SimpleNamespace(
-            data="nav:card:1-glossary",
+            data="nav:card:1:glossary",
             message=message,
             answer=AsyncMock(),
             from_user=SimpleNamespace(id=1),

@@ -93,7 +93,7 @@ def test_back_from_single_section_returns_to_subject(monkeypatch, navtree):
     stack = NavStack(context.user_data)
     stack.push(("term", 1, "T1"))
     stack.push(("subject", 7, "S1"))
-    stack.push(("section", "7-only", "Only"))
+    stack.push(("section", "7:only", "Only"))
 
     query = SimpleNamespace(
         data="nav:back",
@@ -188,9 +188,9 @@ def test_parse_id_handles_composite(navtree):
     assert navtree._parse_id("5") == 5
     assert navtree._parse_id("abc") == "abc"
     assert navtree._parse_id("1-2") == (1, 2)
-    assert navtree._parse_id("123-theory") == (123, "theory")
+    assert navtree._parse_id("123:theory") == (123, "theory")
     assert navtree._parse_id("123-field_trip") == (123, "field_trip")
-    assert navtree._parse_id("12-theory-year") == (12, "theory", "year")
+    assert navtree._parse_id("12:theory:year") == (12, "theory", "year")
 
 
 def test_load_children_merges_level_and_term(monkeypatch, navtree):
@@ -225,9 +225,9 @@ def test_load_children_merges_subject_and_section(monkeypatch, navtree):
 
     children = asyncio.run(run())
     assert children == [
-        ("sec", "7-theory", "نظري 📘"),
-        ("sec", "7-lab", "عملي 🔬"),
-        ("sec", "7-field_trip", "رحلة 🚌"),
+        ("sec", "7:theory", "نظري 📘"),
+        ("sec", "7:lab", "عملي 🔬"),
+        ("sec", "7:field_trip", "رحلة 🚌"),
     ]
 
 
@@ -284,7 +284,7 @@ def test_section_label_translation(monkeypatch, navtree, section, label):
 
     children = asyncio.run(run())
     expected_kind = "sec" if section in navtree.SECTION_LABELS else "card"
-    assert (expected_kind, f"7-{section}", label) in children
+    assert (expected_kind, f"7:{section}", label) in children
 
 
 def test_subject_multi_section_layout(monkeypatch, navtree):
@@ -302,10 +302,10 @@ def test_subject_multi_section_layout(monkeypatch, navtree):
 
     children = asyncio.run(run())
     assert children == [
-        ("sec", "7-theory", navtree.SECTION_LABELS["theory"]),
-        ("sec", "7-lab", navtree.SECTION_LABELS["lab"]),
-        ("card", "7-syllabus", navtree.CARD_LABELS["syllabus"]),
-        ("card", "7-glossary", navtree.CARD_LABELS["glossary"]),
+        ("sec", "7:theory", navtree.SECTION_LABELS["theory"]),
+        ("sec", "7:lab", navtree.SECTION_LABELS["lab"]),
+        ("card", "7:syllabus", navtree.CARD_LABELS["syllabus"]),
+        ("card", "7:glossary", navtree.CARD_LABELS["glossary"]),
     ]
 
 
@@ -326,8 +326,8 @@ def test_subject_single_section_layout(monkeypatch, navtree):
     assert children == [
         ("section_option", "7-theory-year", "حسب السنة"),
         ("section_option", "7-theory-lecturer", "حسب المحاضر"),
-        ("card", "7-syllabus", navtree.CARD_LABELS["syllabus"]),
-        ("card", "7-glossary", navtree.CARD_LABELS["glossary"]),
+        ("card", "7:syllabus", navtree.CARD_LABELS["syllabus"]),
+        ("card", "7:glossary", navtree.CARD_LABELS["glossary"]),
     ]
 
 

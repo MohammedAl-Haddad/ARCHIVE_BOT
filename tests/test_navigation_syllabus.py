@@ -54,7 +54,7 @@ def test_syllabus_section_sends_material(tmp_path):
 
         ctx = SimpleNamespace(user_data={})
         children = await navtree._load_children(ctx, "subject", 1, user_id=None)
-        assert ("card", "1-syllabus", "التوصيف 📄") in children
+        assert ("card", "1:syllabus", "التوصيف 📄") in children
 
         stack = NavStack(ctx.user_data)
         stack.push(("subject", 1, "Sub1"))
@@ -66,7 +66,7 @@ def test_syllabus_section_sends_material(tmp_path):
 
         message = DummyMessage()
         query = SimpleNamespace(
-            data="card:1-syllabus",
+            data="nav:card:1:syllabus",
             message=message,
             answer=AsyncMock(),
             from_user=SimpleNamespace(id=1),
