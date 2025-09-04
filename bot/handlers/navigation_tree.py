@@ -106,26 +106,26 @@ async def _load_children(
         cards = [c for c in CARD_LABELS if c in children_raw]
         if len(sections) > 1:
             for sect in sections:
-                item_id = f"{ident}-{sect}"
+                item_id = f"{ident}:{sect}"
                 children.append(("sec", item_id, SECTION_LABELS[sect]))
             if "syllabus" in cards:
-                children.append(("card", f"{ident}-syllabus", CARD_LABELS["syllabus"]))
+                children.append(("card", f"{ident}:syllabus", CARD_LABELS["syllabus"]))
                 cards.remove("syllabus")
             for card in cards:
-                children.append(("card", f"{ident}-{card}", CARD_LABELS[card]))
+                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
         elif len(sections) == 1:
             sect = sections[0]
             for filt in ("year", "lecturer"):
                 item_id = f"{ident}-{sect}-{filt}"
                 children.append(("section_option", item_id, FILTER_LABELS[filt]))
             if "syllabus" in cards:
-                children.append(("card", f"{ident}-syllabus", CARD_LABELS["syllabus"]))
+                children.append(("card", f"{ident}:syllabus", CARD_LABELS["syllabus"]))
                 cards.remove("syllabus")
             for card in cards:
-                children.append(("card", f"{ident}-{card}", CARD_LABELS[card]))
+                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
         else:
             for card in cards:
-                children.append(("card", f"{ident}-{card}", CARD_LABELS[card]))
+                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
     else:
         for item in children_raw:
             if (
@@ -229,7 +229,7 @@ async def _render(
 
 
 def _parse_id(value: str) -> int | tuple[int, int | str] | tuple[int, int | str, str] | str:
-    parts = value.split("-")
+    parts = value.replace(":", "-").split("-")
     parsed = [int(p) if p.isdigit() else p for p in parts]
     if len(parsed) == 1:
         return parsed[0]
@@ -320,7 +320,7 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if data.startswith("card:"):
         ident_str = data.split(":", 1)[1]
         try:
-            subj_part, card_code = ident_str.split("-", 1)
+            subj_part, card_code = ident_str.split(":", 1)
             subj_id = int(subj_part)
         except Exception:
             subj_id = None
