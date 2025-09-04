@@ -420,6 +420,22 @@ async def get_materials_by_category(
         return await cur.fetchall()
 
 
+async def get_materials_by_card(subject_id: int, card_code: str):
+    """Return materials for a subject card ordered by newest first."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """
+            SELECT id, title, url, tg_storage_chat_id, tg_storage_msg_id
+            FROM materials
+            WHERE subject_id=? AND category=?
+              AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
+            ORDER BY id DESC
+            """,
+            (subject_id, card_code),
+        )
+        return await cur.fetchall()
+
+
 async def has_materials_by_category(subject_id: int, section: str, category: str) -> bool:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(

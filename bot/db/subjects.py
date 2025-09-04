@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from .base import DB_PATH
 
-CATEGORY_SECTIONS = {
+CARD_CODES = {
     "syllabus",
     "glossary",
     "practical",
@@ -260,34 +260,32 @@ async def term_feature_flags(level_id: int, term_id: int) -> dict:
 
 
 async def get_available_sections_for_subject(subject_id: int) -> list[str]:
-    """Return distinct sections available for a subject from materials."""
+    """Return distinct base sections available for a subject from materials."""
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             """
             SELECT DISTINCT section
             FROM materials
             WHERE subject_id=?
-              AND section IN (
-                'theory','discussion','lab','field_trip','syllabus','apps'
-              )
+              AND section IN ('theory','discussion','lab','field_trip')
               AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
             """,
             (subject_id,),
         )
         rows = await cur.fetchall()
-        sections = [r[0] for r in rows]
+        return [r[0] for r in rows]
 
-        for category in CATEGORY_SECTIONS:
-            cur = await db.execute(
-                """
-                SELECT 1 FROM materials
-                WHERE subject_id=? AND category=?
-                  AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
-                LIMIT 1
-                """,
-                (subject_id, category),
-            )
-            if await cur.fetchone() and category not in sections:
-                sections.append(category)
 
-        return sections
+async def get_available_cards_for_subject(subject_id: int) -> list[str]:
+    """Return card codes that have displayable materials for a subject."""
+    placeholders = ",".join("?" * len(CARD_CODES))
+    query = f"""
+        SELECT DISTINCT category
+        FROM materials
+        WHERE subject_id=? AND category IN ({placeholders})
+          AND (url IS NOT NULL OR tg_storage_msg_id IS NOT NULL)
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(query, (subject_id, *CARD_CODES))
+        rows = await cur.fetchall()
+        return [r[0] for r in rows]

@@ -36,7 +36,7 @@ def test_card_button_sends_material(tmp_path):
 
         await materials.insert_material(
             1,
-            "theory",
+            "discussion",
             "glossary",
             "glossary title",
             tg_storage_chat_id=10,

@@ -18,7 +18,6 @@ from ..navigation.tree import (
     get_children,
     CHILD_KIND,
     CACHE_TTL_SECONDS,
-    get_latest_syllabus_material,
     get_latest_material_by_category,
     SECTION_CATEGORY_LABELS,
     CATEGORY_SECTIONS,
@@ -32,6 +31,7 @@ from ..db import (
     get_latest_term_resource,
     get_types_for_lecture,
     LECTURE_TYPE_LABELS,
+    get_materials_by_card,
 )
 from ..utils.retry import retry
 
@@ -326,31 +326,24 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             subj_id = None
             card_code = ""
         try:
-            if card_code == "syllabus":
-                res = await get_latest_syllabus_material(subj_id)
-            else:
-                res = await get_latest_material_by_category(subj_id, "theory", card_code)
-            if res:
-                chat_id, msg_id, url = res
-                if chat_id and msg_id:
-                    target_chat = (
-                        query.message.chat_id if query else update.effective_chat.id
-                    )
-                    thread_id = (
-                        query.message.message_thread_id if query and query.message else None
-                    )
-                    await context.bot.copy_message(
-                        chat_id=target_chat,
-                        from_chat_id=chat_id,
-                        message_id=msg_id,
-                        message_thread_id=thread_id,
-                    )
-                elif url:
-                    await (query.message if query else update.message).reply_text(url)
-                else:
-                    await (query.message if query else update.message).reply_text(
-                        "المادة غير متاحة بعد.",
-                    )
+            mats = await get_materials_by_card(subj_id, card_code)
+            if mats:
+                for _mid, _title, url, chat_id, msg_id in mats:
+                    if chat_id and msg_id:
+                        target_chat = (
+                            query.message.chat_id if query else update.effective_chat.id
+                        )
+                        thread_id = (
+                            query.message.message_thread_id if query and query.message else None
+                        )
+                        await context.bot.copy_message(
+                            chat_id=target_chat,
+                            from_chat_id=chat_id,
+                            message_id=msg_id,
+                            message_thread_id=thread_id,
+                        )
+                    elif url:
+                        await (query.message if query else update.message).reply_text(url)
             else:
                 await (query.message if query else update.message).reply_text(
                     "المادة غير متاحة بعد.",
