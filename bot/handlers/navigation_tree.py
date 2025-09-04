@@ -46,6 +46,10 @@ SECTION_LABELS = {
     "discussion": "مناقشة 💬",
     "lab": "عملي 🔬",
     "field_trip": "رحلة 🚌",
+}
+
+# Arabic labels with icons for subject cards
+CARD_LABELS = {
     "syllabus": "التوصيف 📄",
     "glossary": "المفردات الدراسية 📖",
     "practical": "الواقع التطبيقي ⚙️",
@@ -127,7 +131,9 @@ async def _load_children(
                 )
                 item_id = f"{subj_id}-{sect}-{item_id}-{year_id}"
             if child_kind == "section":
-                item_label = SECTION_LABELS.get(item_label, item_label)
+                item_label = SECTION_LABELS.get(
+                    item_label, CARD_LABELS.get(item_label, item_label)
+                )
             children.append((child_kind, item_id, item_label))
     context.user_data[LAST_CHILDREN_KEY] = {
         "node_key": node_key,
