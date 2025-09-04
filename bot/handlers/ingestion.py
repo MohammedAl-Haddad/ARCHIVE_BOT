@@ -18,7 +18,7 @@ from ..db import (
 )
 from ..db.materials import insert_material, find_exact
 from bot.db.admins import is_owner
-from ..parser.hashtags import parse_hashtags
+from ..parser.hashtags import parse_hashtags, classify_hashtag
 from ..utils.telegram import send_ephemeral, get_file_unique_id_from_message
 
 
@@ -58,6 +58,10 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     category = info.content_type
     title = info.title or ""
     lecturer_name = info.lecturer
+    tags = info.tags or []
+    single_kind = single_code = None
+    if len(tags) == 1:
+        single_kind, single_code = classify_hashtag(tags[0])
 
     lecture_attachment_categories = [
         "board_images",
@@ -70,7 +74,10 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     ]
 
     if category == "lecture" or category in lecture_attachment_categories:
-        lecture_title = f"محاضرة {info.lecture_no}: {info.title}"
+        if info.lecture_no is not None:
+            lecture_title = f"محاضرة {info.lecture_no}: {info.title}"
+        else:
+            lecture_title = title
     else:
         lecture_title = title
 
@@ -158,18 +165,34 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         if thread_id is not None:
             binding = await get_binding(chat.id, thread_id)
             logger.debug("binding=%s", binding)
-        if thread_id is None or binding is None:
+        elif single_kind is not None:
+            binding = await get_binding(chat.id, 0)
+            logger.debug("binding=%s", binding)
+        if binding is None:
+            msg = (
+                "يُرجى النشر داخل موضوع المادة الصحيح"
+                if thread_id is None
+                else "لا يمكن رفع هذا النوع خارج Topic مرتبط بمادة/قسم. استخدم /insert_sub للربط."
+            )
             await send_ephemeral(
                 context,
                 message.chat_id,
-                "لا يمكن رفع هذا النوع خارج Topic مرتبط بمادة/قسم. استخدم /insert_sub للربط.",
+                msg,
                 reply_to_message_id=message.message_id,
                 message_thread_id=message.message_thread_id,
             )
             return
         subject_id = binding["subject_id"]
-        section = binding["section"]
         subject_name = binding["subject_name"]
+        section = binding["section"]
+        if single_kind == "card":
+            category = single_code
+            if section is None:
+                section = "theory"
+        elif single_kind == "sec":
+            category = category or "lecture"
+            if section is None:
+                section = single_code
     else:
         subject_id = section = subject_name = None
 
