@@ -123,9 +123,32 @@ def repo_db(tmp_path, monkeypatch):
                     level_scope TEXT,
                     is_active INTEGER
                 );
+                CREATE TABLE roles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    tags TEXT,
+                    is_enabled INTEGER
+                );
+                CREATE TABLE role_permissions (
+                    role_id INTEGER,
+                    permission_key TEXT,
+                    scope TEXT,
+                    PRIMARY KEY(role_id, permission_key)
+                );
+                CREATE TABLE user_roles (
+                    user_id INTEGER,
+                    role_id INTEGER,
+                    PRIMARY KEY(user_id, role_id)
+                );
                 """
             )
             await db.commit()
 
     asyncio.run(setup())
     return str(db_path)
+
+
+@pytest.fixture
+def anyio_backend():
+    """Force anyio tests to use the asyncio backend."""
+    return "asyncio"
