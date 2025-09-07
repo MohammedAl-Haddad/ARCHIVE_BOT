@@ -71,8 +71,8 @@ def test_db_time_logged(large_dataset, caplog):
 
 
 def test_back_button_pops_stack(monkeypatch, navtree):
-    context = SimpleNamespace(user_data={})
-    stack = NavStack(context.user_data)
+    context = SimpleNamespace(user_data={}, application=SimpleNamespace(bot_data={}))
+    stack = NavStack(context.user_data, bump=0)
     stack.push(("level", 1, "L1"))
     stack.push(("term", 2, "T1"))
 
@@ -89,8 +89,8 @@ def test_back_button_pops_stack(monkeypatch, navtree):
 
 
 def test_back_from_single_section_returns_to_subject(monkeypatch, navtree):
-    context = SimpleNamespace(user_data={})
-    stack = NavStack(context.user_data)
+    context = SimpleNamespace(user_data={}, application=SimpleNamespace(bot_data={}))
+    stack = NavStack(context.user_data, bump=0)
     stack.push(("term", 1, "T1"))
     stack.push(("subject", 7, "S1"))
     stack.push(("section", "7:only", "Only"))
@@ -345,3 +345,38 @@ def test_get_children_accepts_composite(monkeypatch):
     asyncio.run(tree_module.get_children("term", (3, 4)))
 
     assert called["args"] == (3, 4)
+
+
+def test_bump_key_invalidates_cache(monkeypatch, navtree):
+    calls = []
+
+    async def fake_get_children(kind, ident, user_id):
+        calls.append(1)
+        return [(1, "L1")]
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+
+    ctx = SimpleNamespace(
+        user_data={}, application=SimpleNamespace(bot_data={navtree.BUMP_KEY: 1})
+    )
+    asyncio.run(navtree._load_children(ctx, "root", None, user_id=None))
+    asyncio.run(navtree._load_children(ctx, "root", None, user_id=None))
+    assert len(calls) == 1  # served from cache
+
+    ctx.application.bot_data[navtree.BUMP_KEY] = 2
+    asyncio.run(navtree._load_children(ctx, "root", None, user_id=None))
+    assert len(calls) == 2  # cache invalidated by bump
+
+
+def test_subject_children_new_format(monkeypatch, navtree):
+    async def fake_get_children(kind, ident, user_id):
+        assert kind == "subject" and ident == 7
+        return [("section", "theory", "نظري"), ("card", "syllabus", "التوصيف")]
+
+    monkeypatch.setattr(navtree, "get_children", fake_get_children)
+
+    ctx = SimpleNamespace(user_data={}, application=SimpleNamespace(bot_data={}))
+
+    children = asyncio.run(navtree._load_children(ctx, "subject", 7, user_id=None))
+    assert ("section_option", "7-theory-year", "حسب السنة") in children
+    assert ("card", "7:syllabus", "التوصيف") in children
