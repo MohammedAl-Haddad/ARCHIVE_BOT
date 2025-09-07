@@ -1,6 +1,7 @@
 import os
 import pytest
 from types import SimpleNamespace
+import asyncio
 
 os.environ.setdefault("BOT_TOKEN", "x")
 os.environ.setdefault("ARCHIVE_CHANNEL_ID", "1")
@@ -8,8 +9,23 @@ os.environ.setdefault("OWNER_TG_ID", "1")
 
 from bot.handlers import ingestion
 from tests.helpers import TERM_RESOURCE_TAGS
+from bot.repo import hashtags, taxonomy
 
 pytestmark = pytest.mark.anyio
+
+
+@pytest.fixture
+def seed_terms(repo_db):
+    async def _seed():
+        for kind, tags in TERM_RESOURCE_TAGS.items():
+            item_id = await taxonomy.create_item_type(kind, kind, kind, requires_lecture=False)
+            for tag in tags:
+                alias = tag.lstrip("#")
+                aid = await hashtags.create_alias(alias, kind)
+                await hashtags.create_mapping(aid, "item_type", item_id, is_content_tag=True)
+        await hashtags.create_alias("المحاضرة", "lecture_tag")
+    asyncio.run(_seed())
+    return repo_db
 
 
 @pytest.fixture
@@ -23,7 +39,7 @@ TERM_ONLY_TAGS = {
 
 
 @pytest.mark.parametrize("kind, tags", TERM_ONLY_TAGS.items())
-async def test_term_resource_ingestion(kind, tags, monkeypatch):
+async def test_term_resource_ingestion(kind, tags, monkeypatch, seed_terms):
     calls = []
 
     async def fake_insert_term_resource(level_id, term_id, k, chat_id, msg_id):
@@ -68,7 +84,7 @@ async def test_term_resource_ingestion(kind, tags, monkeypatch):
         assert calls == [(1, 1, kind, 111, 222)]
 
 
-async def test_term_resource_unknown_chat_autoregisters(monkeypatch):
+async def test_term_resource_unknown_chat_autoregisters(monkeypatch, seed_terms):
     calls = []
     upserts = []
 
