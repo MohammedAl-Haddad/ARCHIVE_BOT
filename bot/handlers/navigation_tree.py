@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
 
 LAST_CHILDREN_KEY = "last_children"
 LAST_CHILDREN_TTL_SECONDS = CACHE_TTL_SECONDS
+# Key in ``application.bot_data`` used to invalidate per-user caches.
+BUMP_KEY = "navtree_bump"
 
 # Arabic labels with icons for subject sections
 SECTION_LABELS = {
@@ -82,10 +84,14 @@ async def _load_children(
 
     node_key = (kind, ident)
     now = time.time()
+    bump = 0
+    if getattr(context, "application", None):
+        bump = context.application.bot_data.get(BUMP_KEY, 0)
     cached = context.user_data.get(LAST_CHILDREN_KEY)
     if (
         isinstance(cached, dict)
         and cached.get("node_key") == node_key
+        and cached.get("bump") == bump
         and now - cached.get("timestamp", 0) < LAST_CHILDREN_TTL_SECONDS
     ):
         return cached["children"]
@@ -98,34 +104,60 @@ async def _load_children(
             child_kind = filter_by
     children: list = []
     if kind == "lecture" and isinstance(children_raw, dict):
-        for cat in children_raw:
-            label = LECTURE_TYPE_LABELS.get(cat, cat)
+        for cat, entry in children_raw.items():
+            if isinstance(entry, (list, tuple)):
+                label = entry[1] if len(entry) > 1 else entry[0]
+            elif isinstance(entry, dict):
+                label = entry.get("label_ar") or entry.get("label_en") or entry.get("title")
+            else:
+                label = entry
+            if not label:
+                label = LECTURE_TYPE_LABELS.get(cat, cat)
             children.append((child_kind, cat, label))
     elif kind == "subject" and child_kind == "section" and isinstance(children_raw, list):
-        sections = [s for s in SECTION_LABELS if s in children_raw]
-        cards = [c for c in CARD_LABELS if c in children_raw]
+        # ``children_raw`` may be in one of two formats:
+        #   1. legacy: ["theory", "lab", "syllabus"]
+        #   2. new: [("section", "theory", "نظري"), ("card", "syllabus", "التوصيف")]
+        sections: list[tuple[str, str]] = []
+        cards: list[tuple[str, str]] = []
+        if children_raw and all(isinstance(it, (list, tuple)) and len(it) >= 2 for it in children_raw):
+            for item in children_raw:
+                kind_hint = item[0]
+                key = item[1]
+                label = item[2] if len(item) > 2 else None
+                if label is None:
+                    label = SECTION_LABELS.get(key, CARD_LABELS.get(key, str(key)))
+                if kind_hint == "section":
+                    sections.append((key, label))
+                elif kind_hint == "card":
+                    cards.append((key, label))
+                else:
+                    # Fall back to guessing based on known sections
+                    if key in SECTION_LABELS:
+                        sections.append((key, label))
+                    else:
+                        cards.append((key, label))
+        else:
+            # Legacy format: simple list of codes
+            sections = [(s, SECTION_LABELS.get(s, s)) for s in SECTION_LABELS if s in children_raw]
+            cards = [(c, CARD_LABELS.get(c, c)) for c in CARD_LABELS if c in children_raw]
+
         if len(sections) > 1:
-            for sect in sections:
+            for sect, label in sections:
                 item_id = f"{ident}:{sect}"
-                children.append(("sec", item_id, SECTION_LABELS[sect]))
-            if "syllabus" in cards:
-                children.append(("card", f"{ident}:syllabus", CARD_LABELS["syllabus"]))
-                cards.remove("syllabus")
-            for card in cards:
-                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
+                children.append(("sec", item_id, label))
+            for card, label in cards:
+                children.append(("card", f"{ident}:{card}", label))
         elif len(sections) == 1:
-            sect = sections[0]
+            sect, _lab = sections[0]
             for filt in ("year", "lecturer"):
                 item_id = f"{ident}-{sect}-{filt}"
-                children.append(("section_option", item_id, FILTER_LABELS[filt]))
-            if "syllabus" in cards:
-                children.append(("card", f"{ident}:syllabus", CARD_LABELS["syllabus"]))
-                cards.remove("syllabus")
-            for card in cards:
-                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
+                children.append(("section_option", item_id, FILTER_LABELS.get(filt, filt)))
+            for card, label in cards:
+                children.append(("card", f"{ident}:{card}", label))
         else:
-            for card in cards:
-                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
+            for card, label in cards:
+                children.append(("card", f"{ident}:{card}", label))
     else:
         for item in children_raw:
             if (
@@ -138,17 +170,23 @@ async def _load_children(
             elif isinstance(item, (tuple, list)):
                 item_id = item[0]
                 item_label = item[1] if len(item) > 1 else str(item[0])
+            elif isinstance(item, dict):
+                item_id = item.get("id") or item.get("key")
+                item_label = (
+                    item.get("label_ar")
+                    or item.get("label_en")
+                    or item.get("name")
+                    or str(item_id)
+                )
             else:
                 item_id = item
                 item_label = str(item)
             if kind == "level" and child_kind == "term":
                 item_id = f"{ident}-{item_id}"
             elif kind == "section" and child_kind == "section_option":
-                # After selecting a section, show filter options before listing years/lecturers
                 subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
                 item_id = f"{subj_id}-{sect}-{item_id}"
             elif kind == "section_option" and child_kind in {"year", "lecturer"}:
-                # Apply the chosen filter to generate year or lecturer nodes
                 subj_id, sect, _filt = ident if isinstance(ident, tuple) else (ident, None, None)
                 item_id = f"{subj_id}-{sect}-{item_id}"
             elif kind == "year" and child_kind == "year_option":
@@ -168,6 +206,7 @@ async def _load_children(
         "node_key": node_key,
         "timestamp": now,
         "children": children,
+        "bump": bump,
     }
     return children
 
@@ -195,7 +234,10 @@ async def _render(
     db_time = time.perf_counter() - db_start
 
     render_start = time.perf_counter()
-    stack = NavStack(context.user_data)
+    bump = 0
+    if getattr(context, "application", None):
+        bump = context.application.bot_data.get(BUMP_KEY, 0)
+    stack = NavStack(context.user_data, bump=bump)
     keyboard = build_children_keyboard(children, page, include_back=True)
     text = stack.path_text() or "اختر عنصرًا:"
     render_time = time.perf_counter() - render_start
@@ -221,7 +263,7 @@ async def _render(
     logger.info(
         "%s path='%s' db_time=%.3fms render_time=%.3fms message_edit_time=%.3fms",
         action,
-        NavStack(context.user_data).path_text(),
+        NavStack(context.user_data, bump=bump).path_text(),
         db_time * 1000,
         render_time * 1000,
         message_edit_time * 1000,
@@ -239,7 +281,10 @@ def _parse_id(value: str) -> int | tuple[int, int | str] | tuple[int, int | str,
 async def _render_current(
     update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 1, action: str = "selection"
 ) -> None:
-    stack = NavStack(context.user_data)
+    bump = 0
+    if getattr(context, "application", None):
+        bump = context.application.bot_data.get(BUMP_KEY, 0)
+    stack = NavStack(context.user_data, bump=bump)
     node = stack.peek()
     if node is None:
         kind, ident = "root", None
@@ -251,7 +296,10 @@ async def _render_current(
 async def navtree_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Start navigation at the root of the tree."""
 
-    stack = NavStack(context.user_data)
+    bump = 0
+    if getattr(context, "application", None):
+        bump = context.application.bot_data.get(BUMP_KEY, 0)
+    stack = NavStack(context.user_data, bump=bump)
     while stack.pop():
         pass
     try:
@@ -269,7 +317,10 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     data = query.data if query else ""
     if data.startswith("nav:"):
         data = data[4:]
-    stack = NavStack(context.user_data)
+    bump = 0
+    if getattr(context, "application", None):
+        bump = context.application.bot_data.get(BUMP_KEY, 0)
+    stack = NavStack(context.user_data, bump=bump)
 
     if data == "back":
         popped = stack.pop()
