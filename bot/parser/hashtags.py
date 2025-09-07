@@ -1,27 +1,18 @@
-"""Parsing utilities for hashtag based ingestion.
+"""Parsing utilities for hashtag based ingestion backed by the database.
 
-The new ingestion flow relies solely on plain text contained in the caption
-or message body.  ``telegram`` entities are intentionally ignored so the
-parsing logic here works with raw text only.  The helpers normalise hidden
-direction markers, convert Eastern Arabic digits to their Latin
-representation and then extract structured information from the ordered list
-of hashtags.
-
-The parser understands a small, fixed set of hashtags that indicate the
-*content type* in addition to generic tags for the lecture number, year and
-lecturer name.  Term resources such as study plans or channel links accept
-four hashtag aliases each which are enumerated in ``TERM_RESOURCE_ALIASES``.
-The order of these tags is significant and is validated according to the
-rules described in :mod:`README`.
+All hashtag aliases and their mappings are stored in the database and are
+resolved at runtime via :mod:`bot.repo.hashtags`.  Only the ordering rules are
+coded here.  Errors are reported using short codes so the caller can provide
+localised messages.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Iterable, List, Tuple
+from typing import List, Tuple
 
 from ..utils.formatting import arabic_ordinal, to_display_name, ARABIC_ORDINALS
+from ..repo import hashtags, taxonomy
 
 # ---------------------------------------------------------------------------
 # Normalisation helpers
@@ -37,136 +28,8 @@ def _clean(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Tag extraction
+# Tag extraction helpers
 # ---------------------------------------------------------------------------
-
-# Each tuple lists the four accepted hashtag aliases for a term resource.
-# Content editors may use any of the variants and the parser will normalise
-# them to the corresponding category.
-TERM_RESOURCE_ALIASES = {
-    "attendance": (
-        "جدول_الحضور",
-        "الحضور",
-        "جدول_الغياب",
-        "attendance",
-    ),
-    "study_plan": (
-        "الخطة_الدراسية",
-        "الخطة",
-        "خطة_الدراسة",
-        "study_plan",
-    ),
-    "channels": (
-        "روابط_القنوات",
-        "القنوات",
-        "قنوات",
-        "channels",
-    ),
-    "outcomes": (
-        "مخرجات_التعلم",
-        "مخرجات",
-        "نتائج_التعلم",
-        "outcomes",
-    ),
-    "tips": (
-        "نصائح",
-        "نصيحة",
-        "study_tips",
-        "tips",
-    ),
-    "projects": (
-        "مشاريع",
-        "المشاريع",
-        "project_ideas",
-        "projects",
-    ),
-    "programs": (
-        "برامج",
-        "البرامج",
-        "software",
-        "programs",
-    ),
-    "apps": (
-        "تطبيقات",
-        "التطبيقات",
-        "applications",
-        "apps",
-    ),
-    "skills": (
-        "مهارات",
-        "المهارات",
-        "competencies",
-        "skills",
-    ),
-    "forums": (
-        "منتديات",
-        "المنتديات",
-        "communities",
-        "forums",
-    ),
-    "sites": (
-        "مواقع",
-        "المواقع",
-        "websites",
-        "sites",
-    ),
-    "glossary": (
-        "المفردات_الدراسية",
-        "المفردات_الدرسية",
-        "المفردات",
-        "study_vocab",
-        "glossary",
-    ),
-    "practical": (
-        "الواقع_التطبيقي",
-        "الواقع",
-        "real_world",
-        "practical",
-    ),
-    "references": (
-        "مراجع",
-        "المرجع",
-        "references",
-        "refs",
-    ),
-    "open_source_projects": (
-        "مشاريع_مفتوحة_المصدر",
-        "مشاريع_مفتوحة",
-        "open_source_projects",
-        "oss_projects",
-    ),
-    "misc": (
-        "محتوى_اخر",
-        "محتوى_آخر",
-        "miscellaneous",
-        "misc",
-    ),
-}
-
-CONTENT_TYPE_ALIASES = {
-    "موجز_يومي": "daily_brief",
-    "صور_السبورة": "board_images",
-    "الملزمة": "booklet",
-    "نموذج_النصفي": "exam_mid",
-    "نموذج_النهائي": "exam_final",
-    "التوصيف": "syllabus",
-    # Term resource aliases
-    **{alias: key for key, aliases in TERM_RESOURCE_ALIASES.items() for alias in aliases},
-    # Existing types kept for backwards compatibility
-    "slides": "slides",
-    "audio": "audio",
-    "video": "video",
-    "board_images": "board_images",
-    "lecture": "lecture",
-    "summary": "summary",
-    "notes": "notes",
-    "related": "related",
-    "external_link": "external_link",
-    "simulation": "simulation",
-    "mind_map": "mind_map",
-    "transcript": "transcript",
-}
-
 LECTURER_PREFIXES: Tuple[str, ...] = (
     "الدكتور_",
     "الدكتورة_",
@@ -179,59 +42,8 @@ LECTURER_PREFIXES: Tuple[str, ...] = (
 )
 
 ORDINAL_WORDS = {v: k for k, v in ARABIC_ORDINALS.items()}
-
-SECTION_ALIASES = {
-    "نظري": "theory",
-    "مناقشة": "discussion",
-    "مناقشه": "discussion",
-    "عملي": "lab",
-    "رحلة": "field_trip",
-    "theory": "theory",
-    "discussion": "discussion",
-    "lab": "lab",
-    "field_trip": "field_trip",
-}
-
-
-# Hashtags that represent resource cards and sections.  The parser exposes a
-# small helper to classify a single hashtag into one of these categories so
-# calling code can quickly determine the intended destination for a piece of
-# content.
-
-CARD_TAGS = {
-    "#التوصيف": "syllabus",
-    "#المفردات_الدراسية": "glossary",
-    "#الواقع_التطبيقي": "practical",
-    "#المراجع": "references",
-    "#مهارات": "skills",
-    "#مشاريع_مفتوحة_المصدر": "open_source_projects",
-}
-
-SECTION_TAGS = {
-    "#نظري": "theory",
-    "#عملي": "lab",
-    "#مناقشة": "discussion",
-    "#ميداني": "field_trip",
-}
-
-
-def classify_hashtag(tag: str) -> Tuple[str | None, str | None]:
-    """Return ``("card", code)`` or ``("sec", code)`` for known hashtags.
-
-    ``tag`` should include the leading ``#``.  If *tag* does not correspond to a
-    known card or section hashtag ``(None, None)`` is returned.
-    """
-
-    token = tag.strip()
-    code = CARD_TAGS.get(token)
-    if code is not None:
-        return "card", code
-
-    code = SECTION_TAGS.get(token)
-    if code is not None:
-        return "sec", code
-
-    return None, None
+YEAR_TAG_RE = re.compile(r"^#(\d{4})(?:هـ|ه)?$")
+LECTURE_TAG_RE = re.compile(r"^#([^_]+)_(.+?)(?::\s*(.+))?$")
 
 
 @dataclass
@@ -242,22 +54,29 @@ class ParsedHashtags:
     title: str | None = None
     year: int | None = None
     lecturer: str | None = None
-    section: str | None = None
     tags: List[str] | None = None
 
 
-# Regular expressions
-YEAR_TAG_RE = re.compile(r"^#(\d{4})(?:هـ|ه)?$")
-LECTURE_TAG_RE = re.compile(r"^#(?:ال)?محاضرة_(.+?)(?::\s*(.+))?$")
+async def classify_hashtag(tag: str) -> Tuple[str | None, str | None]:
+    """Classify a single hashtag into ("card"|"sec", code)."""
+
+    token = tag.strip()
+    if not token.startswith("#"):
+        return None, None
+    alias = token[1:]
+    rows = await hashtags.get_mappings_for_alias(alias)
+    if not rows:
+        return None, None
+    row = rows[0]
+    alias_row = await hashtags.get_alias(alias)
+    if row[2] == "card":
+        return "card", alias_row[2]
+    if row[2] == "section":
+        return "sec", alias_row[2]
+    return None, None
 
 
 def _split_lines(text: str) -> List[str]:
-    """Return ordered list of hashtag lines from *text*.
-
-    Only lines starting with ``#`` are considered hashtags.  Trailing text
-    after ``:`` is preserved so titles can be extracted for lecture tags.
-    """
-
     lines = []
     for line in text.splitlines():
         s = line.strip()
@@ -266,155 +85,77 @@ def _split_lines(text: str) -> List[str]:
     return lines
 
 
-def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
-    """Parse *text* and return ``(info, error)``.
-
-    ``error`` is ``None`` when parsing and validation succeed.  Otherwise it
-    contains a short Arabic message suitable for presenting to the user.
-    """
+async def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
+    """Parse *text* and return ``(info, error_code)``."""
 
     cleaned = _clean(text or "")
     tags = _split_lines(cleaned)
     info = ParsedHashtags(tags=tags)
-    sequence: List[str] = []
+    if not tags:
+        return info, "E-NO-CONTEXT"
+
+    step = "content"
+    item_type = None
 
     for raw in tags:
         token = raw.split()[0]
+        alias = token.lstrip("#")
 
-        # Content type
-        ct = CONTENT_TYPE_ALIASES.get(token.lstrip("#"))
-        if ct and info.content_type is None:
-            info.content_type = ct
-            sequence.append("content")
+        if step == "content":
+            rows = await hashtags.get_mappings_for_alias(alias)
+            if not rows:
+                return info, "E-ALIAS-UNKNOWN"
+            row = rows[0]
+            if not row[4]:  # not a content tag
+                return info, "E-NO-CONTEXT"
+            if info.content_type is not None:
+                return info, "E-HT-MULTI"
+            alias_row = await hashtags.get_alias(alias)
+            info.content_type = alias_row[2]
+            item_type = await taxonomy.get_item_type(info.content_type)
+            step = "meta"
             continue
 
-        # Section tag
-        sect = SECTION_ALIASES.get(token.lstrip("#"))
-        if sect and info.section is None:
-            info.section = sect
-            continue
-
-        # Year
         m = YEAR_TAG_RE.match(token)
-        if m and info.year is None:
-            y = int(m.group(1))
-            if 1300 <= y <= 1600:
-                info.year = y
-                sequence.append("year")
-                continue
+        if m:
+            info.year = int(m.group(1))
+            continue
 
-        # Lecturer
         if info.lecturer is None:
-            norm = token.lstrip("#")
+            norm = alias
             for p in LECTURER_PREFIXES:
                 if norm.startswith(p):
                     info.lecturer = to_display_name(norm[len(p):])
-                    sequence.append("lecturer")
                     break
+            if info.lecturer is not None:
+                continue
+
+        m = LECTURE_TAG_RE.match(raw)
+        if m and info.lecture_no is None:
+            prefix, ident, title = m.groups()
+            if await hashtags.get_alias(prefix) is None:
+                return info, "E-ALIAS-UNKNOWN"
+            ident = ident.strip()
+            if ident.isdigit():
+                info.lecture_no = int(ident)
             else:
-                # Lecture tag?
-                m = LECTURE_TAG_RE.match(raw)
-                if m and info.lecture_no is None:
-                    ident, title = m.groups()
-                    ident = ident.strip()
-                    if ident.isdigit():
-                        info.lecture_no = int(ident)
-                    else:
-                        info.lecture_no = ORDINAL_WORDS.get(ident)
-                    if info.lecture_no:
-                        info.lecture_no_display = arabic_ordinal(info.lecture_no)
-                    if title:
-                        info.title = title.strip()
-                    sequence.append("lecture")
-                else:
-                    sequence.append("unknown")
-        else:
-            # Lecture tag after lecturer?
-            m = LECTURE_TAG_RE.match(raw)
-            if m and info.lecture_no is None:
-                ident, title = m.groups()
-                ident = ident.strip()
-                if ident.isdigit():
-                    info.lecture_no = int(ident)
-                else:
-                    info.lecture_no = ORDINAL_WORDS.get(ident)
-                if info.lecture_no:
-                    info.lecture_no_display = arabic_ordinal(info.lecture_no)
-                if title:
-                    info.title = title.strip()
-                sequence.append("lecture")
-            else:
-                sequence.append("unknown")
+                info.lecture_no = ORDINAL_WORDS.get(ident)
+            if info.lecture_no:
+                info.lecture_no_display = arabic_ordinal(info.lecture_no)
+            if title:
+                info.title = title.strip()
+            step = "done"
+            continue
 
-    # ------------------------------------------------------------------
-    # Validation of order and required tags
-    # ------------------------------------------------------------------
-    def _err(msg: str) -> Tuple[ParsedHashtags, str]:
-        return info, msg
+        if await hashtags.get_alias(alias) is None:
+            return info, "E-ALIAS-UNKNOWN"
 
-    ct = info.content_type
-    if ct in {"daily_brief", "board_images", "lecture"}:
-        expected = ["content", "lecture", "year"]
-        if ct == "lecture":
-            content_tag = "#lecture"
-        elif ct == "daily_brief":
-            content_tag = "#موجز_يومي"
-        else:
-            content_tag = "#صور_السبورة"
-        if sequence[:3] != expected:
-            return _err(
-                f"رجاءً اتّبع ترتيب الوسوم لهذا النوع: {content_tag}\n#المحاضرة_1: العنوان\n#1446"
-            )
-        if len(sequence) > 4 or (len(sequence) == 4 and sequence[3] != "lecturer"):
-            return _err(
-                f"رجاءً اتّبع ترتيب الوسوم لهذا النوع: {content_tag}\n#المحاضرة_1: العنوان\n#1446\n#الدكتور_اسم (اختياري)"
-            )
-        if not info.lecture_no or not info.title:
-            return _err("هذا النوع يتطلب وسم محاضرة بصيغة: #المحاضرة_1: <العنوان>")
-
-    elif ct in {"booklet", "exam_mid", "exam_final"}:
-        expected = ["content", "year"]
-        if sequence[:2] != expected:
-            return _err(
-                "رجاءً اتّبع ترتيب الوسوم لهذا النوع: #الملزمة\n#1446"
-            )
-        if len(sequence) > 3 or (len(sequence) == 3 and sequence[2] != "lecturer"):
-            return _err(
-                "رجاءً اتّبع ترتيب الوسوم لهذا النوع: #الملزمة\n#1446\n#الدكتور_اسم (اختياري)"
-            )
-
-    elif ct == "syllabus":
-        if not sequence or sequence[0] != "content":
-            return _err("رجاءً اتّبع ترتيب الوسوم لهذا النوع: #التوصيف")
-        if any(s not in {"content", "year", "lecturer"} for s in sequence):
-            return _err("رجاءً اتّبع ترتيب الوسوم لهذا النوع: #التوصيف")
-        if sequence.count("year") and sequence.index("year") != 1:
-            return _err("رجاءً اتّبع ترتيب الوسوم لهذا النوع: #التوصيف\n#1446 (اختياري)")
-        if sequence.count("lecturer"):
-            idx = sequence.index("lecturer")
-            if idx not in {1, 2}:
-                return _err(
-                    "رجاءً اتّبع ترتيب الوسوم لهذا النوع: #التوصيف\n#1446\n#الدكتور_اسم"
-                )
-
-    elif ct == "attendance":
-        if sequence != ["content"]:
-            return _err("رجاءً اتّبع ترتيب الوسوم لهذا النوع: #جدول_الحضور")
-
-    # Types that require lecture tag but have no strict ordering
-    if ct in {"slides", "audio", "video", "board_images"}:
-        if not info.lecture_no:
-            return _err("هذا النوع يتطلب وسم محاضرة بصيغة: #المحاضرة_1: <العنوان>")
+    if info.content_type is None:
+        return info, "E-NO-CONTEXT"
+    if item_type and item_type[4] and info.lecture_no is None:
+        return info, "E-NO-SESSION"
 
     return info, None
 
 
-__all__ = [
-    "parse_hashtags",
-    "ParsedHashtags",
-    "TERM_RESOURCE_ALIASES",
-    "CARD_TAGS",
-    "SECTION_TAGS",
-    "classify_hashtag",
-]
-
+__all__ = ["parse_hashtags", "ParsedHashtags", "classify_hashtag"]

@@ -43,7 +43,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     message = update.effective_message
     file_unique_id = get_file_unique_id_from_message(message)
     text = message.caption or message.text or ""
-    info, error = parse_hashtags(text)
+    info, error = await parse_hashtags(text)
     if error:
         await send_ephemeral(
             context,
@@ -61,7 +61,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     tags = info.tags or []
     single_kind = single_code = None
     if len(tags) == 1:
-        single_kind, single_code = classify_hashtag(tags[0])
+        single_kind, single_code = await classify_hashtag(tags[0])
 
     lecture_attachment_categories = [
         "board_images",
