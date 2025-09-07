@@ -1,0 +1,2 @@
+-- Seed data for dynamic taxonomy tables (sections, cards, item_types, hashtags).
+-- This file intentionally left blank; populate with INSERT statements as needed.
