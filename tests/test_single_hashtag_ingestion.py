@@ -69,7 +69,7 @@ async def _prepare(monkeypatch, binding):
     return insert_calls, attach_calls, sent_msgs, context
 
 
-async def test_single_card_in_topic(monkeypatch):
+async def test_single_card_in_topic(monkeypatch, repo_db):
     binding = {333: {"subject_id": 1, "section": "theory", "subject_name": "sub"}}
     insert_calls, attach_calls, _, context = await _prepare(monkeypatch, binding)
 
@@ -92,7 +92,7 @@ async def test_single_card_in_topic(monkeypatch):
     assert attach_calls == [(99, 10, "pending")]
 
 
-async def test_single_card_general_chat_without_binding(monkeypatch):
+async def test_single_card_general_chat_without_binding(monkeypatch, repo_db):
     binding = {}
     insert_calls, attach_calls, sent_msgs, context = await _prepare(monkeypatch, binding)
 
@@ -116,7 +116,7 @@ async def test_single_card_general_chat_without_binding(monkeypatch):
     assert sent_msgs and "يُرجى النشر داخل موضوع المادة الصحيح" in sent_msgs[0]
 
 
-async def test_single_card_general_chat_with_binding(monkeypatch):
+async def test_single_card_general_chat_with_binding(monkeypatch, repo_db):
     binding = {0: {"subject_id": 1, "section": None, "subject_name": "sub"}}
     insert_calls, attach_calls, _, context = await _prepare(monkeypatch, binding)
 

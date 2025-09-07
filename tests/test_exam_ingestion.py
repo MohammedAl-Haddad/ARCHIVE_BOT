@@ -20,7 +20,7 @@ def anyio_backend():
     ("#نموذج_النصفي\n#1446", "exam_mid"),
     ("#نموذج_النهائي\n#1446", "exam_final"),
 ])
-async def test_exam_ingestion(tag, expected_category, monkeypatch):
+async def test_exam_ingestion(tag, expected_category, monkeypatch, repo_db):
     insert_calls = []
     attach_calls = []
 

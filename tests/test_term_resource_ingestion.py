@@ -136,7 +136,7 @@ async def test_term_resource_unknown_chat_autoregisters(monkeypatch, seed_terms)
 
 
 @pytest.mark.anyio
-async def test_misc_term_resource_ingestion(monkeypatch):
+async def test_misc_term_resource_ingestion(monkeypatch, repo_db):
     """Ensure files tagged with #misc get stored as miscellaneous resources."""
 
     calls = []

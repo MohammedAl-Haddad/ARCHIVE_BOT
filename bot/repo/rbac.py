@@ -1,67 +1,119 @@
-"""Repository utilities for role based access control (RBAC)."""
+"""Repository utilities for role based access control (RBAC).
+
+This module provides a minimal role/permission system. Roles may have tags
+which can be used to broadcast messages to all members of a classification.
+Permissions can optionally be scoped to a JSON object (e.g. limiting a role to
+manage a specific group)."""
 from __future__ import annotations
 
+import json
 import aiosqlite
 
 from bot.db import base
 
-async def create_admin(tg_user_id: int, name: str, role: str,
-                       permissions_mask: int,
-                       *, level_scope: str = "all",
-                       is_active: bool = True) -> int:
-    """Insert an admin account and return its id."""
+
+async def create_role(name: str, tags: list[str] | None = None, *, is_enabled: bool = True) -> int:
+    """Create a role and return its id."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
-            """INSERT INTO admins (tg_user_id, name, role, permissions_mask, level_scope, is_active)
-                VALUES (?, ?, ?, ?, ?, ?)""",
-            (tg_user_id, name, role, permissions_mask, level_scope, int(is_active)),
+            "INSERT INTO roles (name, tags, is_enabled) VALUES (?, ?, ?)",
+            (name, json.dumps(tags or []), int(is_enabled)),
         )
         await db.commit()
         return cur.lastrowid
 
 
-async def get_admin_by_user_id(tg_user_id: int) -> tuple | None:
-    """Return admin row for Telegram ``user_id`` or ``None``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
-        cur = await db.execute(
-            "SELECT id, tg_user_id, name, role, permissions_mask, level_scope, is_active FROM admins WHERE tg_user_id=?",
-            (tg_user_id,),
-        )
-        return await cur.fetchone()
-
-
-async def set_admin_active(tg_user_id: int, is_active: bool) -> None:
-    """Enable or disable an admin account."""
+async def assign_role(user_id: int, role_id: int) -> None:
+    """Assign ``role_id`` to ``user_id``."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         await db.execute(
-            "UPDATE admins SET is_active=? WHERE tg_user_id=?",
-            (int(is_active), tg_user_id),
+            "INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
+            (user_id, role_id),
         )
         await db.commit()
 
 
-async def update_permissions(tg_user_id: int, permissions_mask: int) -> None:
-    """Set the permissions mask for an admin."""
+async def revoke_role(user_id: int, role_id: int) -> None:
+    """Remove ``role_id`` from ``user_id``."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         await db.execute(
-            "UPDATE admins SET permissions_mask=? WHERE tg_user_id=?",
-            (permissions_mask, tg_user_id),
+            "DELETE FROM user_roles WHERE user_id=? AND role_id=?",
+            (user_id, role_id),
         )
         await db.commit()
 
 
-async def has_permissions(tg_user_id: int, mask: int) -> bool:
-    """Return ``True`` if admin ``tg_user_id`` has all permissions in *mask*.
+async def set_permission(role_id: int, permission_key: str, scope: dict | None = None) -> None:
+    """Set a permission for a role.
 
-    The check verifies that the admin exists, is active and that the
-    provided mask bits are present in the stored ``permissions_mask``.
-    """
+    ``scope`` is stored as JSON and may be used to restrict the permission to a
+    specific context such as a group or topic."""
+    async with aiosqlite.connect(base.DB_PATH) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO role_permissions (role_id, permission_key, scope) VALUES (?, ?, ?)",
+            (role_id, permission_key, json.dumps(scope)),
+        )
+        await db.commit()
+
+
+async def has_permission(user_id: int, permission_key: str, scope: dict | None = None) -> bool:
+    """Return True if ``user_id`` has ``permission_key`` with optional ``scope``."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
-            "SELECT permissions_mask, is_active FROM admins WHERE tg_user_id=?",
-            (tg_user_id,),
+            """
+            SELECT rp.scope FROM user_roles ur
+            JOIN role_permissions rp ON ur.role_id = rp.role_id
+            JOIN roles r ON r.id = rp.role_id
+            WHERE ur.user_id=? AND rp.permission_key=? AND r.is_enabled=1
+            """,
+            (user_id, permission_key),
         )
-        row = await cur.fetchone()
-        if row is None or not row[1]:
+        rows = await cur.fetchall()
+        if not rows:
             return False
-        return (row[0] & mask) == mask
+        if scope is None:
+            return True
+        for (scope_json,) in rows:
+            if scope_json is None:
+                return True
+            stored = json.loads(scope_json)
+            if all(stored.get(k) == v for k, v in scope.items()):
+                return True
+        return False
+
+
+async def users_with_tag(tag: str) -> list[int]:
+    """Return all user ids that belong to roles tagged with ``tag``."""
+    async with aiosqlite.connect(base.DB_PATH) as db:
+        cur = await db.execute(
+            """
+            SELECT DISTINCT ur.user_id FROM roles r
+            JOIN user_roles ur ON r.id = ur.role_id
+            JOIN json_each(r.tags) jt
+            WHERE jt.value = ? AND r.is_enabled = 1
+            """,
+            (tag,),
+        )
+        return [row[0] for row in await cur.fetchall()]
+
+
+async def broadcast(tag: str, message: str, send_func) -> int:
+    """Send ``message`` to all users having roles tagged with ``tag``.
+
+    ``send_func`` should be an awaitable accepting ``(user_id, message)``.
+    The function returns the number of users the message was sent to."""
+    user_ids = await users_with_tag(tag)
+    for uid in user_ids:
+        await send_func(uid, message)
+    return len(user_ids)
+
+
+__all__ = [
+    "create_role",
+    "assign_role",
+    "revoke_role",
+    "set_permission",
+    "has_permission",
+    "broadcast",
+    "users_with_tag",
+]
