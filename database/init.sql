@@ -114,9 +114,13 @@ CREATE TABLE IF NOT EXISTS ingestions (
     admin_id INTEGER,
     action TEXT NOT NULL DEFAULT 'add',
     file_unique_id TEXT,
+    chain_id INTEGER,
+    parent_ingestion_id INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (material_id) REFERENCES materials(id),
-    FOREIGN KEY (admin_id) REFERENCES admins(id)
+    FOREIGN KEY (admin_id) REFERENCES admins(id),
+    FOREIGN KEY (chain_id) REFERENCES ingestions(id),
+    FOREIGN KEY (parent_ingestion_id) REFERENCES ingestions(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ingestions_material

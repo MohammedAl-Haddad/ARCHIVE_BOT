@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 import logging
+import time
 
 from ..config import OWNER_TG_ID, config
 from ..db import (
@@ -24,6 +25,11 @@ from ..utils.telegram import send_ephemeral, get_file_unique_id_from_message
 
 logger = logging.getLogger(__name__)
 
+FOLLOW_CMD = "//follow"
+END_CMD = "//end"
+CANCEL_CMD = "//cancel"
+CHAIN_TIMEOUT = 300
+
 
 TERM_RESOURCE_TYPES = {
     "attendance",
@@ -41,8 +47,72 @@ TERM_RESOURCE_TYPES = {
 
 async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+    text = (message.caption or message.text or "").strip()
+
+    chat_data = getattr(context, "chat_data", None)
+    if chat_data is None:
+        chat_data = context.chat_data = {}
+    chains = chat_data.setdefault("follow_chains", {})
+    last_ing = chat_data.setdefault("last_ingestion", {})
+    key = (chat.id if chat else None, user.id if user else None)
+
+    now = time.time()
+    chain = chains.get(key)
+    if chain and chain["expires_at"] <= now:
+        chains.pop(key)
+        chain = None
+
+    if text in {FOLLOW_CMD, END_CMD, CANCEL_CMD}:
+        if text == FOLLOW_CMD:
+            if chain:
+                await send_ephemeral(
+                    context,
+                    chat.id,
+                    "سلسلة متابعة نشطة بالفعل.",
+                    reply_to_message_id=message.message_id,
+                    message_thread_id=message.message_thread_id,
+                )
+            else:
+                parent = last_ing.get(key)
+                if parent is None:
+                    await send_ephemeral(
+                        context,
+                        chat.id,
+                        "لا يوجد إدخال للمتابعة.",
+                        reply_to_message_id=message.message_id,
+                        message_thread_id=message.message_thread_id,
+                    )
+                else:
+                    chains[key] = {
+                        "chain_id": parent,
+                        "last_id": parent,
+                        "expires_at": now + CHAIN_TIMEOUT,
+                    }
+                    await send_ephemeral(
+                        context,
+                        chat.id,
+                        "تم بدء سلسلة المتابعة.",
+                        reply_to_message_id=message.message_id,
+                        message_thread_id=message.message_thread_id,
+                    )
+        else:
+            if chain:
+                chains.pop(key, None)
+                msg = "تم الإنهاء." if text == END_CMD else "تم الإلغاء."
+            else:
+                msg = "لا توجد سلسلة نشطة."
+            await send_ephemeral(
+                context,
+                chat.id,
+                msg,
+                reply_to_message_id=message.message_id,
+                message_thread_id=message.message_thread_id,
+            )
+        return
+
     file_unique_id = get_file_unique_id_from_message(message)
-    text = message.caption or message.text or ""
     info, error = await parse_hashtags(text)
     if error:
         await send_ephemeral(
@@ -81,7 +151,6 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         lecture_title = title
 
-    user = update.effective_user
     if not user:
         logger.warning("No effective user on update")
         if message:
@@ -117,7 +186,6 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
-    chat = update.effective_chat
     thread_id = message.message_thread_id if message else None
     if chat is None:
         logger.warning("Missing chat %s", chat)
@@ -309,9 +377,24 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 created_by_admin_id=admin_id,
             )
 
-    ingestion_id = await insert_ingestion(
-        message.message_id, admin_id, file_unique_id=file_unique_id
-    )
+    chain = chains.get(key)
+    if chain:
+        ingestion_id = await insert_ingestion(
+            message.message_id,
+            admin_id,
+            file_unique_id=file_unique_id,
+            chain_id=chain["chain_id"],
+            parent_ingestion_id=chain["last_id"],
+        )
+        chain["last_id"] = ingestion_id
+        chain["expires_at"] = time.time() + CHAIN_TIMEOUT
+        last_ing[key] = ingestion_id
+    else:
+        ingestion_id = await insert_ingestion(
+            message.message_id, admin_id, file_unique_id=file_unique_id
+        )
+        last_ing[key] = ingestion_id
+
     await attach_material(ingestion_id, material_id, "pending")
     await send_ephemeral(
         context,
