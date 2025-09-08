@@ -4,9 +4,9 @@ from bot.repo import materials, taxonomy
 
 
 def test_materials_crud(repo_db):
-    sid = asyncio.run(taxonomy.create_section("theory", "نظري", "Theory"))
-    cid = asyncio.run(taxonomy.create_card("lecture", "محاضرة", "Lecture", section_id=sid))
-    iid = asyncio.run(taxonomy.create_item_type("file", "ملف", "File"))
+    sid = asyncio.run(taxonomy.create_section("نظري", "Theory"))
+    cid = asyncio.run(taxonomy.create_card("محاضرة", "Lecture", section_id=sid))
+    iid = asyncio.run(taxonomy.create_item_type("ملف", "File"))
     mid = asyncio.run(
         materials.insert_material(
             subject_id=1,
