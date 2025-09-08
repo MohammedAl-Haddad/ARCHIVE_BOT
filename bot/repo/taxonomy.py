@@ -13,21 +13,12 @@ async def create_section(
     *,
     is_enabled: bool = True,
     sort_order: int = 0,
-) -> int:
-    """إنشاء قسم جديد | Insert a new section and return its id.
+    lang: str = "ar",
+) -> dict:
+    """Insert a new section and return it as a dictionary.
 
-    Args:
-        label_ar: الاسم بالعربية / Arabic label.
-        label_en: الاسم بالإنجليزية / English label.
-        is_enabled: هل هو مفعّل؟ / enabled flag.
-        sort_order: ترتيب العرض / sort order.
-
-    Returns:
-        int: معرف القسم / section id.
-
-    Raises:
-        RepoConstraintError: عند فشل القيود.
-        RepoError: أخطاء قاعدة البيانات.
+    The returned dict contains at least ``id``, ``label``, ``sort_order`` and
+    ``is_enabled`` with ``label`` chosen based on *lang*.
     """
 
     async with connect() as db:
@@ -36,66 +27,94 @@ async def create_section(
             (label_ar, label_en, int(is_enabled), sort_order),
         )
         await db.commit()
-        return cur.lastrowid
+        section_id = cur.lastrowid
+
+    return await get_section(section_id, lang=lang, include_disabled=True)
 
 
 @translate_errors
-async def get_section(section_id: int) -> tuple | None:
-    """جلب صف القسم أو ``None`` | Return section row or ``None``.
+async def get_section(
+    section_id: int,
+    *,
+    lang: str = "ar",
+    include_disabled: bool = False,
+) -> dict | None:
+    """Return a single section as a dictionary or ``None``.
 
-    Args:
-        section_id: معرف القسم / section id.
-
-    Returns:
-        tuple | None: صف القسم / section row.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
+    By default only enabled sections are returned unless ``include_disabled`` is
+    set.
     """
 
     async with connect() as db:
-        cur = await db.execute(
-            "SELECT id, label_ar, label_en, is_enabled, sort_order, created_at, updated_at FROM sections WHERE id=?",
-            (section_id,),
+        query = (
+            f"SELECT id, label_{lang}, sort_order, is_enabled FROM sections"
+            " WHERE id=?"
         )
-        return await cur.fetchone()
+        params = [section_id]
+        if not include_disabled:
+            query += " AND is_enabled=1"
+        cur = await db.execute(query, params)
+        row = await cur.fetchone()
+
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "label": row[1],
+        "sort_order": row[2],
+        "is_enabled": bool(row[3]),
+    }
 
 
 @translate_errors
-async def update_section(section_id: int, **fields) -> None:
-    """تحديث بيانات قسم | Update a section with given fields.
-
-    Args:
-        section_id: معرف القسم / section id.
-        **fields: الحقول المعدلة / fields to update.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+async def update_section(
+    section_id: int,
+    *,
+    lang: str = "ar",
+    **fields,
+) -> dict | None:
+    """Update a section and return the updated row as a dictionary."""
 
     if not fields:
-        return
+        return await get_section(section_id, lang=lang, include_disabled=True)
     cols = ", ".join(f"{k}=?" for k in fields)
     params = list(fields.values()) + [section_id]
     async with connect() as db:
         await db.execute(f"UPDATE sections SET {cols} WHERE id=?", params)
         await db.commit()
+    return await get_section(section_id, lang=lang, include_disabled=True)
 
 
 @translate_errors
 async def delete_section(section_id: int) -> None:
-    """حذف قسم بالمعرف | Delete section by id.
-
-    Args:
-        section_id: معرف القسم / section id.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+    """Delete a section by id."""
 
     async with connect() as db:
         await db.execute("DELETE FROM sections WHERE id=?", (section_id,))
         await db.commit()
+
+
+@translate_errors
+async def get_sections(
+    *, lang: str = "ar", include_disabled: bool = False
+) -> list[dict]:
+    """Return all sections ordered by ``sort_order``.
+
+    Only enabled sections are returned unless ``include_disabled`` is ``True``.
+    """
+
+    async with connect() as db:
+        query = f"SELECT id, label_{lang}, sort_order, is_enabled FROM sections"
+        if not include_disabled:
+            query += " WHERE is_enabled=1"
+        query += " ORDER BY sort_order"
+        cur = await db.execute(query)
+        rows = await cur.fetchall()
+
+    return [
+        {"id": r[0], "label": r[1], "sort_order": r[2], "is_enabled": bool(r[3])}
+        for r in rows
+    ]
 
 # ---------------------------------------------------------------------------
 # Cards (material categories)
@@ -109,24 +128,9 @@ async def create_card(
     show_when_empty: bool = False,
     is_enabled: bool = True,
     sort_order: int = 0,
-) -> int:
-    """إنشاء بطاقة مادة | Insert a card (category) and return its id.
-
-    Args:
-        label_ar: الاسم بالعربية.
-        label_en: الاسم بالإنجليزية.
-        section_id: معرف القسم أو ``None``.
-        show_when_empty: إظهار حتى لو فارغة؟
-        is_enabled: حالة التفعيل.
-        sort_order: ترتيب العرض.
-
-    Returns:
-        int: معرف البطاقة.
-
-    Raises:
-        RepoConstraintError: عند فشل القيود.
-        RepoError: أخطاء قاعدة البيانات.
-    """
+    lang: str = "ar",
+) -> dict:
+    """Insert a new card and return it as a dictionary."""
 
     async with connect() as db:
         cur = await db.execute(
@@ -143,68 +147,103 @@ async def create_card(
             ),
         )
         await db.commit()
-        return cur.lastrowid
+        card_id = cur.lastrowid
+
+    return await get_card(card_id, lang=lang, include_disabled=True)
 
 
 @translate_errors
-async def get_card(card_id: int) -> tuple | None:
-    """جلب صف بطاقة أو ``None`` | Return card row or ``None``.
-
-    Args:
-        card_id: معرف البطاقة.
-
-    Returns:
-        tuple | None: صف البطاقة.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+async def get_card(
+    card_id: int,
+    *,
+    lang: str = "ar",
+    include_disabled: bool = False,
+) -> dict | None:
+    """Return a card as a dictionary or ``None``."""
 
     async with connect() as db:
-        cur = await db.execute(
-            """SELECT id, section_id, label_ar, label_en, show_when_empty,
-                       is_enabled, sort_order, created_at, updated_at
-                   FROM cards WHERE id=?""",
-            (card_id,),
+        query = (
+            f"SELECT id, section_id, label_{lang}, show_when_empty, is_enabled, sort_order"
+            " FROM cards WHERE id=?"
         )
-        return await cur.fetchone()
+        params = [card_id]
+        if not include_disabled:
+            query += " AND is_enabled=1"
+        cur = await db.execute(query, params)
+        row = await cur.fetchone()
+
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "section_id": row[1],
+        "label": row[2],
+        "show_when_empty": bool(row[3]),
+        "is_enabled": bool(row[4]),
+        "sort_order": row[5],
+    }
 
 
 @translate_errors
-async def update_card(card_id: int, **fields) -> None:
-    """تحديث بطاقة | Update card with fields.
-
-    Args:
-        card_id: معرف البطاقة.
-        **fields: الحقول المعدلة.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+async def update_card(
+    card_id: int,
+    *,
+    lang: str = "ar",
+    **fields,
+) -> dict | None:
+    """Update a card and return the updated row as a dictionary."""
 
     if not fields:
-        return
+        return await get_card(card_id, lang=lang, include_disabled=True)
     cols = ", ".join(f"{k}=?" for k in fields)
     params = list(fields.values()) + [card_id]
     async with connect() as db:
         await db.execute(f"UPDATE cards SET {cols} WHERE id=?", params)
         await db.commit()
+    return await get_card(card_id, lang=lang, include_disabled=True)
 
 
 @translate_errors
 async def delete_card(card_id: int) -> None:
-    """حذف بطاقة بالمعرف | Delete card by id.
-
-    Args:
-        card_id: معرف البطاقة.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+    """Delete a card by id."""
 
     async with connect() as db:
         await db.execute("DELETE FROM cards WHERE id=?", (card_id,))
         await db.commit()
+
+
+@translate_errors
+async def get_cards(
+    *, section_id: int | None = None, lang: str = "ar", include_disabled: bool = False
+) -> list[dict]:
+    """Return cards optionally filtered by section."""
+
+    async with connect() as db:
+        query = f"SELECT id, section_id, label_{lang}, show_when_empty, is_enabled, sort_order FROM cards"
+        clauses = []
+        params: list = []
+        if section_id is not None:
+            clauses.append("section_id=?")
+            params.append(section_id)
+        if not include_disabled:
+            clauses.append("is_enabled=1")
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY sort_order"
+        cur = await db.execute(query, params)
+        rows = await cur.fetchall()
+
+    return [
+        {
+            "id": r[0],
+            "section_id": r[1],
+            "label": r[2],
+            "show_when_empty": bool(r[3]),
+            "is_enabled": bool(r[4]),
+            "sort_order": r[5],
+        }
+        for r in rows
+    ]
 
 # ---------------------------------------------------------------------------
 # Item types
@@ -219,25 +258,9 @@ async def create_item_type(
     allows_lecturer: bool = True,
     is_enabled: bool = True,
     sort_order: int = 0,
-) -> int:
-    """إنشاء نوع عنصر | Insert an item type and return its id.
-
-    Args:
-        label_ar: الاسم بالعربية.
-        label_en: الاسم بالإنجليزية.
-        requires_lecture: هل يتطلب محاضرة؟
-        allows_year: يسمح بالسنة؟
-        allows_lecturer: يسمح بالمحاضر؟
-        is_enabled: حالة التفعيل.
-        sort_order: ترتيب العرض.
-
-    Returns:
-        int: معرف النوع.
-
-    Raises:
-        RepoConstraintError: عند فشل القيود.
-        RepoError: أخطاء قاعدة البيانات.
-    """
+    lang: str = "ar",
+) -> dict:
+    """Insert an item type and return it as a dictionary."""
 
     async with connect() as db:
         cur = await db.execute(
@@ -255,68 +278,154 @@ async def create_item_type(
             ),
         )
         await db.commit()
-        return cur.lastrowid
+        item_type_id = cur.lastrowid
+
+    return await get_item_type(item_type_id, lang=lang, include_disabled=True)
 
 
 @translate_errors
-async def get_item_type(item_type_id: int) -> tuple | None:
-    """جلب صف نوع عنصر أو ``None`` | Return item type row or ``None``.
-
-    Args:
-        item_type_id: معرف النوع.
-
-    Returns:
-        tuple | None: صف النوع.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+async def get_item_type(
+    item_type_id: int,
+    *,
+    lang: str = "ar",
+    include_disabled: bool = False,
+) -> dict | None:
+    """Return an item type as a dictionary or ``None``."""
 
     async with connect() as db:
-        cur = await db.execute(
-            """SELECT id, label_ar, label_en, requires_lecture, allows_year,
-                       allows_lecturer, is_enabled, sort_order, created_at, updated_at
-                   FROM item_types WHERE id=?""",
-            (item_type_id,),
+        query = (
+            f"SELECT id, label_{lang}, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order"
+            " FROM item_types WHERE id=?"
         )
-        return await cur.fetchone()
+        params = [item_type_id]
+        if not include_disabled:
+            query += " AND is_enabled=1"
+        cur = await db.execute(query, params)
+        row = await cur.fetchone()
+
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "label": row[1],
+        "requires_lecture": bool(row[2]),
+        "allows_year": bool(row[3]),
+        "allows_lecturer": bool(row[4]),
+        "is_enabled": bool(row[5]),
+        "sort_order": row[6],
+    }
 
 
 @translate_errors
-async def update_item_type(item_type_id: int, **fields) -> None:
-    """تحديث نوع عنصر | Update item type with fields.
-
-    Args:
-        item_type_id: معرف النوع.
-        **fields: الحقول المعدلة.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+async def update_item_type(
+    item_type_id: int,
+    *,
+    lang: str = "ar",
+    **fields,
+) -> dict | None:
+    """Update an item type and return the updated row as a dictionary."""
 
     if not fields:
-        return
+        return await get_item_type(item_type_id, lang=lang, include_disabled=True)
     cols = ", ".join(f"{k}=?" for k in fields)
     params = list(fields.values()) + [item_type_id]
     async with connect() as db:
         await db.execute(f"UPDATE item_types SET {cols} WHERE id=?", params)
         await db.commit()
+    return await get_item_type(item_type_id, lang=lang, include_disabled=True)
 
 
 @translate_errors
 async def delete_item_type(item_type_id: int) -> None:
-    """حذف نوع عنصر | Delete item type by id.
-
-    Args:
-        item_type_id: معرف النوع.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+    """Delete an item type by id."""
 
     async with connect() as db:
         await db.execute("DELETE FROM item_types WHERE id=?", (item_type_id,))
         await db.commit()
+
+
+@translate_errors
+async def get_item_types(
+    *, lang: str = "ar", include_disabled: bool = False
+) -> list[dict]:
+    """Return all item types ordered by ``sort_order``."""
+
+    async with connect() as db:
+        query = (
+            f"SELECT id, label_{lang}, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order"
+            " FROM item_types"
+        )
+        if not include_disabled:
+            query += " WHERE is_enabled=1"
+        query += " ORDER BY sort_order"
+        cur = await db.execute(query)
+        rows = await cur.fetchall()
+
+    return [
+        {
+            "id": r[0],
+            "label": r[1],
+            "requires_lecture": bool(r[2]),
+            "allows_year": bool(r[3]),
+            "allows_lecturer": bool(r[4]),
+            "is_enabled": bool(r[5]),
+            "sort_order": r[6],
+        }
+        for r in rows
+    ]
+
+# ---------------------------------------------------------------------------
+# Section item types
+# ---------------------------------------------------------------------------
+
+
+@translate_errors
+async def set_section_item_type(
+    section_id: int,
+    item_type_id: int,
+    *,
+    is_enabled: bool = True,
+    sort_order: int = 0,
+) -> None:
+    """Upsert a section-item_type mapping."""
+
+    async with connect() as db:
+        await db.execute(
+            """INSERT INTO section_item_types
+                (section_id, item_type_id, is_enabled, sort_order)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(section_id, item_type_id)
+                DO UPDATE SET is_enabled=excluded.is_enabled, sort_order=excluded.sort_order""",
+            (section_id, item_type_id, int(is_enabled), sort_order),
+        )
+        await db.commit()
+
+
+@translate_errors
+async def get_item_types_for_section(
+    section_id: int,
+    *,
+    lang: str = "ar",
+    include_disabled: bool = False,
+) -> list[dict]:
+    """Return item types linked to a section."""
+
+    async with connect() as db:
+        query = f"""SELECT it.id, it.label_{lang}, sit.sort_order, sit.is_enabled
+                    FROM section_item_types AS sit
+                    JOIN item_types AS it ON it.id = sit.item_type_id
+                    WHERE sit.section_id=?"""
+        params = [section_id]
+        if not include_disabled:
+            query += " AND sit.is_enabled=1 AND it.is_enabled=1"
+        query += " ORDER BY sit.sort_order"
+        cur = await db.execute(query, params)
+        rows = await cur.fetchall()
+
+    return [
+        {"id": r[0], "label": r[1], "sort_order": r[2], "is_enabled": bool(r[3])}
+        for r in rows
+    ]
 
 # ---------------------------------------------------------------------------
 # Subject section enablement
@@ -354,22 +463,27 @@ async def set_subject_section_enable(
 
 
 @translate_errors
-async def get_enabled_sections_for_subject(subject_id: int) -> list[tuple]:
-    """الأقسام المفعلة لمادة | Return enabled sections for a subject.
-
-    Args:
-        subject_id: معرف المادة.
-
-    Returns:
-        list[tuple]: قائمة الأقسام.
-
-    Raises:
-        RepoError: أخطاء قاعدة البيانات.
-    """
+async def get_sections_for_subject(
+    subject_id: int,
+    *,
+    lang: str = "ar",
+    include_disabled: bool = False,
+) -> list[dict]:
+    """Return sections enabled for a subject."""
 
     async with connect() as db:
-        cur = await db.execute(
-            "SELECT section_id, is_enabled, sort_order FROM subject_section_enable WHERE subject_id=? ORDER BY sort_order",
-            (subject_id,),
-        )
-        return await cur.fetchall()
+        query = f"""SELECT s.id, s.label_{lang}, sse.sort_order, sse.is_enabled
+                    FROM subject_section_enable AS sse
+                    JOIN sections AS s ON s.id = sse.section_id
+                    WHERE sse.subject_id=?"""
+        params = [subject_id]
+        if not include_disabled:
+            query += " AND sse.is_enabled=1 AND s.is_enabled=1"
+        query += " ORDER BY sse.sort_order"
+        cur = await db.execute(query, params)
+        rows = await cur.fetchall()
+
+    return [
+        {"id": r[0], "label": r[1], "sort_order": r[2], "is_enabled": bool(r[3])}
+        for r in rows
+    ]

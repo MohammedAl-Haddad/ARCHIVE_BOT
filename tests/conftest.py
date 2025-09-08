@@ -60,6 +60,16 @@ def repo_db(tmp_path, monkeypatch):
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE section_item_types (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    section_id INTEGER NOT NULL,
+                    item_type_id INTEGER NOT NULL,
+                    is_enabled INTEGER,
+                    sort_order INTEGER,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(section_id, item_type_id)
+                );
                 CREATE TABLE subject_section_enable (
                     subject_id INTEGER,
                     section_id INTEGER,
