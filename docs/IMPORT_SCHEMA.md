@@ -19,8 +19,21 @@ which tables are processed during export and import.
 ```
 
 Each key contains a list of objects representing rows in the respective
-database table.  Keys appear in the order above so that foreign-key
-references (e.g. card → section) can be resolved during import.
+database table.  Keys appear in the order above so that foreign-key references (e.g. card → section) can be resolved during import.
+
+## Example
+```json
+{
+  "sections": [{"key": "theory", "label_ar": "نظري", "label_en": "Theory", "is_enabled": 1, "sort_order": 0}],
+  "cards": [{"key": "slides", "label_ar": "سلايدات", "label_en": "Slides", "section": "theory", "show_when_empty": 0, "is_enabled": 1, "sort_order": 0}],
+  "item_types": [],
+  "aliases": [],
+  "mappings": [],
+  "subject_section_enable": [],
+  "presets": []
+}
+```
+
 
 ### sections
 
