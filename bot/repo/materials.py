@@ -8,10 +8,9 @@ and for handlers that merely need basic persistence.
 """
 from __future__ import annotations
 
-import aiosqlite
+from . import connect, translate_errors
 
-from bot.db import base
-
+@translate_errors
 async def insert_material(
     subject_id: int,
     section_id: int | None,
@@ -32,8 +31,36 @@ async def insert_material(
     source_message_id: int | None = None,
     created_by_admin_id: int | None = None,
 ) -> int:
-    """Insert a material record and return its id."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """إضافة مادة وإرجاع معرفها | Insert material and return its id.
+
+    Args:
+        subject_id: معرف المادة / subject id.
+        section_id: معرف القسم أو ``None``.
+        category_id: معرف التصنيف أو ``None``.
+        item_type_id: نوع العنصر أو ``None``.
+        title: العنوان / title text.
+        url: رابط أو ``None``.
+        year_id: معرف السنة أو ``None``.
+        lecturer_id: معرف المحاضر أو ``None``.
+        lecture_no: رقم المحاضرة أو ``None``.
+        content_hash: بصمة المحتوى أو ``None``.
+        tg_storage_chat_id: معرف التخزين في تيليغرام أو ``None``.
+        tg_storage_msg_id: رسالة التخزين أو ``None``.
+        file_unique_id: معرف الملف أو ``None``.
+        source_chat_id: معرف المصدر أو ``None``.
+        source_topic_id: موضوع المصدر أو ``None``.
+        source_message_id: رسالة المصدر أو ``None``.
+        created_by_admin_id: معرف المسؤول أو ``None``.
+
+    Returns:
+        int: معرف السجل / new row id.
+
+    Raises:
+        RepoConstraintError: عند فشل القيود.
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             """INSERT INTO materials (
                     subject_id, section_id, category_id, item_type_id, title, url,
@@ -66,9 +93,21 @@ async def insert_material(
         return cur.lastrowid
 
 
+@translate_errors
 async def get_material(material_id: int) -> tuple | None:
-    """Return material row for *material_id* or ``None``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """جلب صف المادة أو ``None`` | Return material row or ``None``.
+
+    Args:
+        material_id: معرف المادة / material id.
+
+    Returns:
+        tuple | None: صف المادة / material row.
+
+    Raises:
+        RepoError: عند حدوث خطأ في قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             "SELECT * FROM materials WHERE id=?",
             (material_id,),
@@ -76,6 +115,7 @@ async def get_material(material_id: int) -> tuple | None:
         return await cur.fetchone()
 
 
+@translate_errors
 async def update_material_storage(
     material_id: int,
     chat_id: int,
@@ -83,8 +123,19 @@ async def update_material_storage(
     *,
     file_unique_id: str | None = None,
 ) -> None:
-    """Update storage chat/message identifiers for a material."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """تحديث معلومات التخزين للمادة | Update storage identifiers.
+
+    Args:
+        material_id: معرف المادة / material id.
+        chat_id: معرف الدردشة / chat id.
+        msg_id: معرف الرسالة / message id.
+        file_unique_id: معرف الملف أو ``None``.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات / DB errors.
+    """
+
+    async with connect() as db:
         await db.execute(
             "UPDATE materials SET tg_storage_chat_id=?, tg_storage_msg_id=?, file_unique_id=? WHERE id=?",
             (chat_id, msg_id, file_unique_id, material_id),
@@ -92,16 +143,37 @@ async def update_material_storage(
         await db.commit()
 
 
+@translate_errors
 async def delete_material(material_id: int) -> None:
-    """Remove a material record."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """حذف سجل مادة | Delete a material record.
+
+    Args:
+        material_id: معرف المادة / material id.
+
+    Raises:
+        RepoError: عند فشل قاعدة البيانات.
+    """
+
+    async with connect() as db:
         await db.execute("DELETE FROM materials WHERE id=?", (material_id,))
         await db.commit()
 
 
+@translate_errors
 async def find_by_hash(content_hash: str) -> tuple | None:
-    """Return the first material row matching *content_hash*."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """البحث عن مادة ببصمة المحتوى | Find material by content hash.
+
+    Args:
+        content_hash: البصمة المراد البحث عنها / hash to search.
+
+    Returns:
+        tuple | None: صف المادة أو ``None`` / material row or ``None``.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات / DB errors.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             "SELECT * FROM materials WHERE content_hash=?",
             (content_hash,),

@@ -1,16 +1,36 @@
 """Helpers for managing the dynamic taxonomy tables using id-based lookups."""
 from __future__ import annotations
 
-import aiosqlite
-
-from bot.db import base
+from . import connect, translate_errors
 
 # ---------------------------------------------------------------------------
 # Sections
 # ---------------------------------------------------------------------------
-async def create_section(label_ar: str, label_en: str, *, is_enabled: bool = True, sort_order: int = 0) -> int:
-    """Insert a new section and return its database id."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+@translate_errors
+async def create_section(
+    label_ar: str,
+    label_en: str,
+    *,
+    is_enabled: bool = True,
+    sort_order: int = 0,
+) -> int:
+    """إنشاء قسم جديد | Insert a new section and return its id.
+
+    Args:
+        label_ar: الاسم بالعربية / Arabic label.
+        label_en: الاسم بالإنجليزية / English label.
+        is_enabled: هل هو مفعّل؟ / enabled flag.
+        sort_order: ترتيب العرض / sort order.
+
+    Returns:
+        int: معرف القسم / section id.
+
+    Raises:
+        RepoConstraintError: عند فشل القيود.
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             "INSERT INTO sections (label_ar, label_en, is_enabled, sort_order) VALUES (?, ?, ?, ?)",
             (label_ar, label_en, int(is_enabled), sort_order),
@@ -19,9 +39,21 @@ async def create_section(label_ar: str, label_en: str, *, is_enabled: bool = Tru
         return cur.lastrowid
 
 
+@translate_errors
 async def get_section(section_id: int) -> tuple | None:
-    """Return the section row for *section_id* or ``None`` if not found."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """جلب صف القسم أو ``None`` | Return section row or ``None``.
+
+    Args:
+        section_id: معرف القسم / section id.
+
+    Returns:
+        tuple | None: صف القسم / section row.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             "SELECT id, label_ar, label_en, is_enabled, sort_order, created_at, updated_at FROM sections WHERE id=?",
             (section_id,),
@@ -29,26 +61,46 @@ async def get_section(section_id: int) -> tuple | None:
         return await cur.fetchone()
 
 
+@translate_errors
 async def update_section(section_id: int, **fields) -> None:
-    """Update a section row using keyword *fields*."""
+    """تحديث بيانات قسم | Update a section with given fields.
+
+    Args:
+        section_id: معرف القسم / section id.
+        **fields: الحقول المعدلة / fields to update.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
     if not fields:
         return
     cols = ", ".join(f"{k}=?" for k in fields)
     params = list(fields.values()) + [section_id]
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    async with connect() as db:
         await db.execute(f"UPDATE sections SET {cols} WHERE id=?", params)
         await db.commit()
 
 
+@translate_errors
 async def delete_section(section_id: int) -> None:
-    """Delete section with *section_id*."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """حذف قسم بالمعرف | Delete section by id.
+
+    Args:
+        section_id: معرف القسم / section id.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         await db.execute("DELETE FROM sections WHERE id=?", (section_id,))
         await db.commit()
 
 # ---------------------------------------------------------------------------
 # Cards (material categories)
 # ---------------------------------------------------------------------------
+@translate_errors
 async def create_card(
     label_ar: str,
     label_en: str,
@@ -58,8 +110,25 @@ async def create_card(
     is_enabled: bool = True,
     sort_order: int = 0,
 ) -> int:
-    """Insert a card (material category) and return its id."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """إنشاء بطاقة مادة | Insert a card (category) and return its id.
+
+    Args:
+        label_ar: الاسم بالعربية.
+        label_en: الاسم بالإنجليزية.
+        section_id: معرف القسم أو ``None``.
+        show_when_empty: إظهار حتى لو فارغة؟
+        is_enabled: حالة التفعيل.
+        sort_order: ترتيب العرض.
+
+    Returns:
+        int: معرف البطاقة.
+
+    Raises:
+        RepoConstraintError: عند فشل القيود.
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             """INSERT INTO cards
                 (section_id, label_ar, label_en, show_when_empty, is_enabled, sort_order)
@@ -77,9 +146,21 @@ async def create_card(
         return cur.lastrowid
 
 
+@translate_errors
 async def get_card(card_id: int) -> tuple | None:
-    """Return card row for *card_id* or ``None``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """جلب صف بطاقة أو ``None`` | Return card row or ``None``.
+
+    Args:
+        card_id: معرف البطاقة.
+
+    Returns:
+        tuple | None: صف البطاقة.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             """SELECT id, section_id, label_ar, label_en, show_when_empty,
                        is_enabled, sort_order, created_at, updated_at
@@ -89,26 +170,46 @@ async def get_card(card_id: int) -> tuple | None:
         return await cur.fetchone()
 
 
+@translate_errors
 async def update_card(card_id: int, **fields) -> None:
-    """Update card row with given *fields*."""
+    """تحديث بطاقة | Update card with fields.
+
+    Args:
+        card_id: معرف البطاقة.
+        **fields: الحقول المعدلة.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
     if not fields:
         return
     cols = ", ".join(f"{k}=?" for k in fields)
     params = list(fields.values()) + [card_id]
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    async with connect() as db:
         await db.execute(f"UPDATE cards SET {cols} WHERE id=?", params)
         await db.commit()
 
 
+@translate_errors
 async def delete_card(card_id: int) -> None:
-    """Delete card with *card_id*."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """حذف بطاقة بالمعرف | Delete card by id.
+
+    Args:
+        card_id: معرف البطاقة.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         await db.execute("DELETE FROM cards WHERE id=?", (card_id,))
         await db.commit()
 
 # ---------------------------------------------------------------------------
 # Item types
 # ---------------------------------------------------------------------------
+@translate_errors
 async def create_item_type(
     label_ar: str,
     label_en: str,
@@ -119,8 +220,26 @@ async def create_item_type(
     is_enabled: bool = True,
     sort_order: int = 0,
 ) -> int:
-    """Insert an item type and return its id."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """إنشاء نوع عنصر | Insert an item type and return its id.
+
+    Args:
+        label_ar: الاسم بالعربية.
+        label_en: الاسم بالإنجليزية.
+        requires_lecture: هل يتطلب محاضرة؟
+        allows_year: يسمح بالسنة؟
+        allows_lecturer: يسمح بالمحاضر؟
+        is_enabled: حالة التفعيل.
+        sort_order: ترتيب العرض.
+
+    Returns:
+        int: معرف النوع.
+
+    Raises:
+        RepoConstraintError: عند فشل القيود.
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             """INSERT INTO item_types
                 (label_ar, label_en, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order)
@@ -139,9 +258,21 @@ async def create_item_type(
         return cur.lastrowid
 
 
+@translate_errors
 async def get_item_type(item_type_id: int) -> tuple | None:
-    """Return item type row for *item_type_id* or ``None``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """جلب صف نوع عنصر أو ``None`` | Return item type row or ``None``.
+
+    Args:
+        item_type_id: معرف النوع.
+
+    Returns:
+        tuple | None: صف النوع.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             """SELECT id, label_ar, label_en, requires_lecture, allows_year,
                        allows_lecturer, is_enabled, sort_order, created_at, updated_at
@@ -151,26 +282,46 @@ async def get_item_type(item_type_id: int) -> tuple | None:
         return await cur.fetchone()
 
 
+@translate_errors
 async def update_item_type(item_type_id: int, **fields) -> None:
-    """Update an item type row with *fields*."""
+    """تحديث نوع عنصر | Update item type with fields.
+
+    Args:
+        item_type_id: معرف النوع.
+        **fields: الحقول المعدلة.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
     if not fields:
         return
     cols = ", ".join(f"{k}=?" for k in fields)
     params = list(fields.values()) + [item_type_id]
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    async with connect() as db:
         await db.execute(f"UPDATE item_types SET {cols} WHERE id=?", params)
         await db.commit()
 
 
+@translate_errors
 async def delete_item_type(item_type_id: int) -> None:
-    """Delete item type with *item_type_id*."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """حذف نوع عنصر | Delete item type by id.
+
+    Args:
+        item_type_id: معرف النوع.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         await db.execute("DELETE FROM item_types WHERE id=?", (item_type_id,))
         await db.commit()
 
 # ---------------------------------------------------------------------------
 # Subject section enablement
 # ---------------------------------------------------------------------------
+@translate_errors
 async def set_subject_section_enable(
     subject_id: int,
     section_id: int,
@@ -178,8 +329,19 @@ async def set_subject_section_enable(
     is_enabled: bool = True,
     sort_order: int = 0,
 ) -> None:
-    """Upsert ``subject_section_enable`` row for *subject_id*/*section_id*."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """تفعيل قسم لمادة | Upsert subject-section enable row.
+
+    Args:
+        subject_id: معرف المادة.
+        section_id: معرف القسم.
+        is_enabled: حالة التفعيل.
+        sort_order: ترتيب العرض.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         await db.execute(
             """INSERT INTO subject_section_enable
                 (subject_id, section_id, is_enabled, sort_order)
@@ -191,9 +353,21 @@ async def set_subject_section_enable(
         await db.commit()
 
 
+@translate_errors
 async def get_enabled_sections_for_subject(subject_id: int) -> list[tuple]:
-    """Return enabled sections for *subject_id* ordered by ``sort_order``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """الأقسام المفعلة لمادة | Return enabled sections for a subject.
+
+    Args:
+        subject_id: معرف المادة.
+
+    Returns:
+        list[tuple]: قائمة الأقسام.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             "SELECT section_id, is_enabled, sort_order FROM subject_section_enable WHERE subject_id=? ORDER BY sort_order",
             (subject_id,),

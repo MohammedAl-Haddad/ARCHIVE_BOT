@@ -7,14 +7,33 @@ manage a specific group)."""
 from __future__ import annotations
 
 import json
-import aiosqlite
 
-from bot.db import base
+from . import connect, translate_errors
 
 
-async def create_role(name: str, tags: list[str] | None = None, *, is_enabled: bool = True) -> int:
-    """Create a role and return its id."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+@translate_errors
+async def create_role(
+    name: str,
+    tags: list[str] | None = None,
+    *,
+    is_enabled: bool = True,
+) -> int:
+    """إنشاء دور جديد | Create a role and return its id.
+
+    Args:
+        name: اسم الدور / role name.
+        tags: وسوم اختيارية / optional tags.
+        is_enabled: هل الدور مفعّل؟ / enabled flag.
+
+    Returns:
+        int: معرف الدور / role id.
+
+    Raises:
+        RepoConstraintError: عند فشل القيود.
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             "INSERT INTO roles (name, tags, is_enabled) VALUES (?, ?, ?)",
             (name, json.dumps(tags or []), int(is_enabled)),
@@ -23,9 +42,19 @@ async def create_role(name: str, tags: list[str] | None = None, *, is_enabled: b
         return cur.lastrowid
 
 
+@translate_errors
 async def assign_role(user_id: int, role_id: int) -> None:
-    """Assign ``role_id`` to ``user_id``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """إسناد دور لمستخدم | Assign ``role_id`` to ``user_id``.
+
+    Args:
+        user_id: معرف المستخدم / user id.
+        role_id: معرف الدور / role id.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         await db.execute(
             "INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, ?)",
             (user_id, role_id),
@@ -33,9 +62,19 @@ async def assign_role(user_id: int, role_id: int) -> None:
         await db.commit()
 
 
+@translate_errors
 async def revoke_role(user_id: int, role_id: int) -> None:
-    """Remove ``role_id`` from ``user_id``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """إزالة دور من مستخدم | Remove ``role_id`` from ``user_id``.
+
+    Args:
+        user_id: معرف المستخدم / user id.
+        role_id: معرف الدور / role id.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         await db.execute(
             "DELETE FROM user_roles WHERE user_id=? AND role_id=?",
             (user_id, role_id),
@@ -43,12 +82,20 @@ async def revoke_role(user_id: int, role_id: int) -> None:
         await db.commit()
 
 
+@translate_errors
 async def set_permission(role_id: int, permission_key: str, scope: dict | None = None) -> None:
-    """Set a permission for a role.
+    """تعيين صلاحية لدور | Set a permission for a role.
 
-    ``scope`` is stored as JSON and may be used to restrict the permission to a
-    specific context such as a group or topic."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    Args:
+        role_id: معرف الدور / role id.
+        permission_key: مفتاح الصلاحية / permission key.
+        scope: نطاق اختياري بصيغة JSON / optional scope.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         await db.execute(
             "INSERT OR REPLACE INTO role_permissions (role_id, permission_key, scope) VALUES (?, ?, ?)",
             (role_id, permission_key, json.dumps(scope)),
@@ -56,9 +103,23 @@ async def set_permission(role_id: int, permission_key: str, scope: dict | None =
         await db.commit()
 
 
+@translate_errors
 async def has_permission(user_id: int, permission_key: str, scope: dict | None = None) -> bool:
-    """Return True if ``user_id`` has ``permission_key`` with optional ``scope``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """تحقق من صلاحية مستخدم | Return True if user has permission.
+
+    Args:
+        user_id: معرف المستخدم / user id.
+        permission_key: مفتاح الصلاحية.
+        scope: نطاق اختياري / optional scope.
+
+    Returns:
+        bool: ``True`` إذا كانت الصلاحية موجودة / True if allowed.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             """
             SELECT rp.scope FROM user_roles ur
@@ -82,9 +143,21 @@ async def has_permission(user_id: int, permission_key: str, scope: dict | None =
         return False
 
 
+@translate_errors
 async def users_with_tag(tag: str) -> list[int]:
-    """Return all user ids that belong to roles tagged with ``tag``."""
-    async with aiosqlite.connect(base.DB_PATH) as db:
+    """إرجاع المستخدمين حسب الوسم | Return user ids for roles tagged with ``tag``.
+
+    Args:
+        tag: الوسم المطلوب / tag value.
+
+    Returns:
+        list[int]: قائمة المعرفات / list of user ids.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
+    async with connect() as db:
         cur = await db.execute(
             """
             SELECT DISTINCT ur.user_id FROM roles r
@@ -97,11 +170,22 @@ async def users_with_tag(tag: str) -> list[int]:
         return [row[0] for row in await cur.fetchall()]
 
 
+@translate_errors
 async def broadcast(tag: str, message: str, send_func) -> int:
-    """Send ``message`` to all users having roles tagged with ``tag``.
+    """بث رسالة لمستخدمين بوسم معين | Broadcast message to tagged users.
 
-    ``send_func`` should be an awaitable accepting ``(user_id, message)``.
-    The function returns the number of users the message was sent to."""
+    Args:
+        tag: الوسم المطلوب / tag value.
+        message: الرسالة / message text.
+        send_func: دالة الإرسال ``(user_id, message)``.
+
+    Returns:
+        int: عدد المستخدمين المرسَل إليهم / number of recipients.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات.
+    """
+
     user_ids = await users_with_tag(tag)
     for uid in user_ids:
         await send_func(uid, message)
