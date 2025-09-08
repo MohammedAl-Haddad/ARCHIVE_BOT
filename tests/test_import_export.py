@@ -13,7 +13,7 @@ def test_export_import_roundtrip(repo_db):
     iid = asyncio.run(
         taxonomy.create_item_type("بي دي اف", "PDF", requires_lecture=1)
     )["id"]
-    alias_id = asyncio.run(hashtags.create_alias("hw", "hw"))
+    alias_id = asyncio.run(hashtags.create_alias("hw"))
     asyncio.run(hashtags.create_mapping(alias_id, "card", cid))
     asyncio.run(taxonomy.set_subject_section_enable(1, sid, sort_order=1))
 
