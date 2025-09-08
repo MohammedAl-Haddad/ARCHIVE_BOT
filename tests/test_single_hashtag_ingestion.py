@@ -26,7 +26,15 @@ async def _prepare(monkeypatch, binding):
         insert_calls.append((subject_id, section, category, title))
         return 10
 
-    async def fake_insert_ingestion(msg_id, admin_id, action="add", file_unique_id=None):
+    async def fake_insert_ingestion(
+        msg_id,
+        admin_id,
+        status="pending",
+        action="add",
+        file_unique_id=None,
+        chain_id=None,
+        parent_ingestion_id=None,
+    ):
         return 99
 
     async def fake_attach_material(ingestion_id, material_id, status):

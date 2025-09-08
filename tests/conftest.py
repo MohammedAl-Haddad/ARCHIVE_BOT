@@ -85,6 +85,8 @@ def repo_db(tmp_path, monkeypatch):
                     normalized TEXT,
                     lang TEXT
                 );
+                CREATE UNIQUE INDEX ux_hashtag_aliases_normalized
+                    ON hashtag_aliases(normalized COLLATE NOCASE);
                 CREATE TABLE hashtag_mappings (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     alias_id INTEGER,
@@ -93,6 +95,8 @@ def repo_db(tmp_path, monkeypatch):
                     is_content_tag INTEGER,
                     overrides TEXT
                 );
+                CREATE UNIQUE INDEX ux_hashtag_mappings_alias
+                    ON hashtag_mappings(alias_id);
                 CREATE TABLE materials (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     subject_id INTEGER NOT NULL,

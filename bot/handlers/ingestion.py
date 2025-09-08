@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 import logging
+import time
 
 from ..config import OWNER_TG_ID, config
 from ..db import (
@@ -18,6 +19,8 @@ from ..db import (
 )
 from ..db.materials import insert_material, find_exact
 from bot.db.admins import is_owner
+import asyncio
+
 from ..parser.hashtags import parse_hashtags, classify_hashtag
 from ..utils.telegram import send_ephemeral, get_file_unique_id_from_message
 from ..policies.sensitivity import policy as sensitivity_policy
@@ -44,7 +47,11 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     message = update.effective_message
     file_unique_id = get_file_unique_id_from_message(message)
     text = message.caption or message.text or ""
-    info, error = await parse_hashtags(text)
+    res = parse_hashtags(text)
+    if asyncio.iscoroutine(res):
+        info, error = await res
+    else:
+        info, error = res
     if error:
         await send_ephemeral(
             context,
@@ -53,6 +60,28 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             reply_to_message_id=message.message_id,
             message_thread_id=message.message_thread_id,
         )
+        return
+
+    chat = update.effective_chat
+    user = update.effective_user
+    key = (chat.id, user.id) if chat and user else None
+    if not hasattr(context, "chat_data"):
+        context.chat_data = {}
+
+    if text.startswith("//"):
+        command = text.strip().lower()
+        chains = context.chat_data.setdefault("follow_chains", {})
+        if command == "//follow" and key:
+            last_map = context.chat_data.setdefault("last_ingestion", {})
+            last_id = last_map.get(key)
+            if last_id is not None:
+                chains[key] = {
+                    "chain_id": last_id,
+                    "parent_id": last_id,
+                    "expires_at": time.time() + 60,
+                }
+        elif command in {"//end", "//cancel"} and key:
+            chains.pop(key, None)
         return
 
     year = info.year
@@ -207,6 +236,16 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
+    if sensitivity_policy.is_sensitive(text, section=section):
+        await send_ephemeral(
+            context,
+            message.chat_id,
+            "E-PHI-BLOCK",
+            reply_to_message_id=message.message_id,
+            message_thread_id=thread_id,
+        )
+        return
+
     if category in TERM_RESOURCE_TYPES:
         level_id = group_info[1]
         term_id = group_info[2]
@@ -310,10 +349,30 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 created_by_admin_id=admin_id,
             )
 
+    chain_id = parent_id = None
+    if key:
+        chains = context.chat_data.setdefault("follow_chains", {})
+        chain = chains.get(key)
+        if chain and chain["expires_at"] < time.time():
+            chains.pop(key)
+            chain = None
+        if chain:
+            chain_id = chain["chain_id"]
+            parent_id = chain["parent_id"]
+
     ingestion_id = await insert_ingestion(
-        message.message_id, admin_id, file_unique_id=file_unique_id
+        message.message_id,
+        admin_id,
+        file_unique_id=file_unique_id,
+        chain_id=chain_id,
+        parent_ingestion_id=parent_id,
     )
     await attach_material(ingestion_id, material_id, "pending")
+    if key:
+        context.chat_data.setdefault("last_ingestion", {})[key] = ingestion_id
+        if chain_id:
+            chains[key]["parent_id"] = ingestion_id
+            chains[key]["expires_at"] = time.time() + 60
     await send_ephemeral(
         context,
         chat.id,

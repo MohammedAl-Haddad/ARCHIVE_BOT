@@ -9,6 +9,9 @@ async def insert_ingestion(
     status: str = "pending",
     action: str = "add",
     file_unique_id: str | None = None,
+    *,
+    chain_id: int | None = None,
+    parent_ingestion_id: int | None = None,
 ) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
