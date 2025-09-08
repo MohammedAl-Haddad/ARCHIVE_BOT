@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 import logging
+import inspect
 
 from ..config import OWNER_TG_ID, config
 from ..db import (
@@ -43,7 +44,11 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     message = update.effective_message
     file_unique_id = get_file_unique_id_from_message(message)
     text = message.caption or message.text or ""
-    info, error = parse_hashtags(text)
+    result = parse_hashtags(text)
+    if inspect.isawaitable(result):
+        info, error = await result
+    else:
+        info, error = result
     if error:
         await send_ephemeral(
             context,
@@ -55,7 +60,8 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return
 
     year = info.year
-    category = info.content_type
+    category_id = getattr(info, "content_type", None)
+    item_type_id = getattr(info, "item_type_id", None)
     title = info.title or ""
     lecturer_name = info.lecturer
     tags = info.tags or []
@@ -73,7 +79,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         "related",
     ]
 
-    if category == "lecture" or category in lecture_attachment_categories:
+    if category_id == "lecture" or category_id in lecture_attachment_categories:
         if info.lecture_no is not None:
             lecture_title = f"محاضرة {info.lecture_no}: {info.title}"
         else:
@@ -135,7 +141,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     logger.debug("group_info=%s", group_info)
     auto_registered = False
     if group_info is None:
-        if category in TERM_RESOURCE_TYPES:
+        if category_id in TERM_RESOURCE_TYPES:
             level_id = getattr(config, "DEFAULT_LEVEL_ID", 1)
             term_id = getattr(config, "DEFAULT_TERM_ID", 1)
             await upsert_group(
@@ -161,7 +167,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             )
             return
     binding = None
-    if category not in TERM_RESOURCE_TYPES:
+    if category_id not in TERM_RESOURCE_TYPES:
         if thread_id is not None:
             binding = await get_binding(chat.id, thread_id)
             logger.debug("binding=%s", binding)
@@ -184,19 +190,19 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             return
         subject_id = binding["subject_id"]
         subject_name = binding["subject_name"]
-        section = binding["section"]
+        section_id = binding.get("section_id")
         if single_kind == "card":
-            category = single_code
-            if section is None:
-                section = "theory"
+            category_id = single_code
+            if section_id is None:
+                section_id = 1
         elif single_kind == "sec":
-            category = category or "lecture"
-            if section is None:
-                section = single_code
+            category_id = category_id or "lecture"
+            if section_id is None:
+                section_id = single_code
     else:
-        subject_id = section = subject_name = None
+        subject_id = section_id = subject_name = None
 
-    if category is None:
+    if category_id is None:
         await send_ephemeral(
             context,
             message.chat_id,
@@ -231,12 +237,13 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     alt_title = title if lecture_title != title else None
     existing = await find_exact(
         subject_id,
-        section,
-        category,
+        section_id,
+        category_id,
         lookup_title,
         year_id=year_id,
         lecturer_id=lecturer_id,
-        alt_title=alt_title,
+        lecture_no=info.lecture_no,
+        content_hash=file_unique_id,
     )
     if existing:
         ctx = context.user_data.setdefault("replace_ctx", {})
@@ -247,8 +254,8 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             "admin_id": admin_id,
             "tg_user_id": user.id,
             "subject_name": subject_name,
-            "section": section,
-            "category": category,
+            "section_id": section_id,
+            "category_id": category_id,
             "title": title,
             "year": year,
             "year_id": year_id,
@@ -275,12 +282,15 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     material_title = lecture_title if lecture_title != title else title
     material_id = await insert_material(
-        subject_id,
-        section,
-        category,
-        material_title,
+        subject_id=subject_id,
+        section_id=section_id,
+        category_id=category_id,
+        item_type_id=item_type_id,
+        title=material_title,
         year_id=year_id,
         lecturer_id=lecturer_id,
+        lecture_no=info.lecture_no,
+        content_hash=file_unique_id,
         file_unique_id=file_unique_id,
         source_chat_id=chat.id,
         source_topic_id=thread_id,
@@ -288,22 +298,22 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         created_by_admin_id=admin_id,
     )
 
-    if category in lecture_attachment_categories:
+    if category_id in lecture_attachment_categories:
         lecture = await find_exact(
             subject_id,
-            section,
+            section_id,
             "lecture",
             lecture_title,
             year_id=year_id,
             lecturer_id=lecturer_id,
-            alt_title=title if lecture_title != title else None,
         )
         if not lecture:
             await insert_material(
-                subject_id,
-                section,
-                "lecture",
-                lecture_title,
+                subject_id=subject_id,
+                section_id=section_id,
+                category_id="lecture",
+                item_type_id=None,
+                title=lecture_title,
                 year_id=year_id,
                 lecturer_id=lecturer_id,
                 created_by_admin_id=admin_id,

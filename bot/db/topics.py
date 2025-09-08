@@ -17,7 +17,7 @@ async def get_binding(tg_chat_id: int, tg_topic_id: int) -> dict | None:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             """
-            SELECT t.subject_id, s.name, t.section
+            SELECT t.subject_id, s.name, t.section_id
             FROM topics t
             JOIN groups g ON g.id = t.group_id
             JOIN subjects s ON s.id = t.subject_id
@@ -27,11 +27,11 @@ async def get_binding(tg_chat_id: int, tg_topic_id: int) -> dict | None:
         )
         row = await cur.fetchone()
         if row:
-            return {"subject_id": row[0], "subject_name": row[1], "section": row[2]}
+            return {"subject_id": row[0], "subject_name": row[1], "section_id": row[2]}
         return None
 
 
-async def bind(tg_chat_id: int, tg_topic_id: int, subject_id: int, section: str) -> None:
+async def bind(tg_chat_id: int, tg_topic_id: int, subject_id: int, section_id: int | None) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             "SELECT id FROM groups WHERE tg_chat_id=?",
@@ -43,13 +43,13 @@ async def bind(tg_chat_id: int, tg_topic_id: int, subject_id: int, section: str)
         group_id = row[0]
         await db.execute(
             """
-            INSERT INTO topics (group_id, tg_topic_id, subject_id, section)
+            INSERT INTO topics (group_id, tg_topic_id, subject_id, section_id)
             VALUES (?, ?, ?, ?)
             ON CONFLICT(group_id, tg_topic_id) DO UPDATE SET
                 subject_id=excluded.subject_id,
-                section=excluded.section
+                section_id=excluded.section_id
             """,
-            (group_id, tg_topic_id, subject_id, section),
+            (group_id, tg_topic_id, subject_id, section_id),
         )
         await db.commit()
     await cleanup_orphan_topics()

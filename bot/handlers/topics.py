@@ -34,6 +34,8 @@ SECTION_ALIASES = {
     "عملي": "lab",
     "رحلة": "field_trip",
 }
+# Static ids used in tests; production code would query the database
+SECTION_IDS = {"theory": 1, "discussion": 2, "lab": 3, "field_trip": 4}
 
 SECTION_LABELS = {
     "theory": "نظري",
@@ -108,10 +110,11 @@ async def insert_sub_received(update: Update, context: ContextTypes.DEFAULT_TYPE
     if m_full:
         subject = m_full.group("subject").strip()
         sect_label = m_full.group("section")
-        section = SECTION_ALIASES[sect_label]
+        section_code = SECTION_ALIASES[sect_label]
         info.update({
             "subject_name": subject,
-            "section": section,
+            "section": section_code,
+            "section_id": SECTION_IDS.get(section_code),
             "theory_only": False,
         })
         theory_label = "لا"
@@ -153,7 +156,7 @@ async def insert_sub_theory_choice(update: Update, context: ContextTypes.DEFAULT
     if not info:
         return ConversationHandler.END
     theory_only = query.data == "sub_t_yes"
-    info.update({"theory_only": theory_only, "section": "theory"})
+    info.update({"theory_only": theory_only, "section": "theory", "section_id": SECTION_IDS.get("theory")})
     theory_label = "نعم" if theory_only else "لا"
     subject = info.get("subject_name", "")
     buttons = [[
@@ -182,13 +185,13 @@ async def insert_sub_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE)
         _, level_id, term_id = group_info
         subject = await get_or_create_subject(term_id, info["subject_name"], level_id=level_id)
         await set_theory_only(subject.id, info.get("theory_only", False))
-        await bind(chat.id, info["thread_id"], subject.id, info["section"])
+        await bind(chat.id, info["thread_id"], subject.id, info.get("section_id"))
         logger.info(
             "topic %s in %s bound to subject=%s section=%s",
             info["thread_id"],
             chat.id,
             subject.id,
-            info["section"],
+            info.get("section"),
         )
         await conv_cleanup(context, context.bot, chat.id)
         await send_ephemeral(

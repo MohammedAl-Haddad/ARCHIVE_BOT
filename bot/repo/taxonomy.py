@@ -1,16 +1,11 @@
-"""Helpers for managing the dynamic taxonomy tables.
+"""Repository helpers for dynamic taxonomy tables.
 
-The repository exposes CRUD operations for the following tables:
-
-* ``sections``
-* ``cards`` (material categories)
-* ``item_types``
-* ``subject_section_enable``
-
-Each function returns basic Python types (``int`` ids or ``tuple`` rows)
-so that higher level code can remain agnostic of the underlying SQL
-implementation.  All operations are asynchronous and use the global
-``DB_PATH`` from :mod:`bot.db.base`.
+The original implementation used textual ``key`` identifiers for
+sections, cards and item types.  The database schema no longer includes
+those columns; instead, callers refer to records via their numeric
+primary keys.  The functions here expose a very small CRUD interface
+returning tuples that also include ``created_at`` and ``updated_at``
+timestamps for convenience.
 """
 from __future__ import annotations
 
@@ -21,35 +16,35 @@ from bot.db import base
 # ---------------------------------------------------------------------------
 # Sections
 # ---------------------------------------------------------------------------
-async def create_section(key: str, label_ar: str, label_en: str,
-                        *, is_enabled: bool = True, sort_order: int = 0) -> int:
-    """Insert a new section and return its database id."""
+async def create_section(
+    label_ar: str,
+    label_en: str,
+    *,
+    is_enabled: bool = True,
+    sort_order: int = 0,
+) -> int:
+    """Insert a section and return its id."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
-            """INSERT INTO sections (key, label_ar, label_en, is_enabled, sort_order)
-                VALUES (?, ?, ?, ?, ?)""",
-            (key, label_ar, label_en, int(is_enabled), sort_order),
+            """INSERT INTO sections (label_ar, label_en, is_enabled, sort_order)
+                VALUES (?, ?, ?, ?)""",
+            (label_ar, label_en, int(is_enabled), sort_order),
         )
         await db.commit()
         return cur.lastrowid
 
 
-async def get_section(key: str) -> tuple | None:
-    """Return the section row for *key* or ``None`` if not found."""
+async def get_section(section_id: int) -> tuple | None:
+    """Return section row for *section_id* or ``None``."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
-            "SELECT id, key, label_ar, label_en, is_enabled, sort_order FROM sections WHERE key=?",
-            (key,),
+            "SELECT id, label_ar, label_en, is_enabled, sort_order, created_at, updated_at FROM sections WHERE id=?",
+            (section_id,),
         )
         return await cur.fetchone()
 
 
 async def update_section(section_id: int, **fields) -> None:
-    """Update a section row using keyword *fields*.
-
-    Only supplied fields are updated.  Allowed keys: ``key``, ``label_ar``,
-    ``label_en``, ``is_enabled`` and ``sort_order``.
-    """
     if not fields:
         return
     cols = ", ".join(f"{k}=?" for k in fields)
@@ -60,30 +55,33 @@ async def update_section(section_id: int, **fields) -> None:
 
 
 async def delete_section(section_id: int) -> None:
-    """Delete section with *section_id*."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         await db.execute("DELETE FROM sections WHERE id=?", (section_id,))
         await db.commit()
 
+
 # ---------------------------------------------------------------------------
 # Cards (material categories)
 # ---------------------------------------------------------------------------
-async def create_card(key: str, label_ar: str, label_en: str, *,
-                      section_id: int | None = None,
-                      show_when_empty: bool = False,
-                      is_enabled: bool = True,
-                      sort_order: int = 0) -> int:
-    """Insert a card (material category) and return its id."""
+async def create_card(
+    label_ar: str,
+    label_en: str,
+    *,
+    section_id: int | None = None,
+    show_when_empty: bool = False,
+    is_enabled: bool = True,
+    sort_order: int = 0,
+) -> int:
+    """Insert a card and return its id."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
             """INSERT INTO cards
-                (key, label_ar, label_en, section_id, show_when_empty, is_enabled, sort_order)
-                VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (section_id, label_ar, label_en, show_when_empty, is_enabled, sort_order)
+                VALUES (?, ?, ?, ?, ?, ?)""",
             (
-                key,
+                section_id,
                 label_ar,
                 label_en,
-                section_id,
                 int(show_when_empty),
                 int(is_enabled),
                 sort_order,
@@ -93,22 +91,16 @@ async def create_card(key: str, label_ar: str, label_en: str, *,
         return cur.lastrowid
 
 
-async def get_card(key: str) -> tuple | None:
-    """Return card row for *key* or ``None``."""
+async def get_card(card_id: int) -> tuple | None:
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
-            "SELECT id, key, label_ar, label_en, section_id, show_when_empty, is_enabled, sort_order FROM cards WHERE key=?",
-            (key,),
+            "SELECT id, section_id, label_ar, label_en, show_when_empty, is_enabled, sort_order, created_at, updated_at FROM cards WHERE id=?",
+            (card_id,),
         )
         return await cur.fetchone()
 
 
 async def update_card(card_id: int, **fields) -> None:
-    """Update card row with given *fields*.
-
-    Allowed keys: ``key``, ``label_ar``, ``label_en``, ``section_id``,
-    ``show_when_empty``, ``is_enabled`` and ``sort_order``.
-    """
     if not fields:
         return
     cols = ", ".join(f"{k}=?" for k in fields)
@@ -119,28 +111,31 @@ async def update_card(card_id: int, **fields) -> None:
 
 
 async def delete_card(card_id: int) -> None:
-    """Delete card with *card_id*."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         await db.execute("DELETE FROM cards WHERE id=?", (card_id,))
         await db.commit()
 
+
 # ---------------------------------------------------------------------------
 # Item types
 # ---------------------------------------------------------------------------
-async def create_item_type(key: str, label_ar: str, label_en: str, *,
-                           requires_lecture: bool = False,
-                           allows_year: bool = True,
-                           allows_lecturer: bool = True,
-                           is_enabled: bool = True,
-                           sort_order: int = 0) -> int:
+async def create_item_type(
+    label_ar: str,
+    label_en: str,
+    *,
+    requires_lecture: bool = False,
+    allows_year: bool = True,
+    allows_lecturer: bool = True,
+    is_enabled: bool = True,
+    sort_order: int = 0,
+) -> int:
     """Insert an item type and return its id."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
             """INSERT INTO item_types
-                (key, label_ar, label_en, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (label_ar, label_en, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
-                key,
                 label_ar,
                 label_en,
                 int(requires_lecture),
@@ -154,22 +149,16 @@ async def create_item_type(key: str, label_ar: str, label_en: str, *,
         return cur.lastrowid
 
 
-async def get_item_type(key: str) -> tuple | None:
-    """Return item type row for *key* or ``None``."""
+async def get_item_type(item_type_id: int) -> tuple | None:
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
-            "SELECT id, key, label_ar, label_en, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order FROM item_types WHERE key=?",
-            (key,),
+            "SELECT id, label_ar, label_en, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order, created_at, updated_at FROM item_types WHERE id=?",
+            (item_type_id,),
         )
         return await cur.fetchone()
 
 
 async def update_item_type(item_type_id: int, **fields) -> None:
-    """Update an item type row with *fields*.
-
-    Allowed keys: ``key``, ``label_ar``, ``label_en``, ``requires_lecture``,
-    ``allows_year``, ``allows_lecturer``, ``is_enabled`` and ``sort_order``.
-    """
     if not fields:
         return
     cols = ", ".join(f"{k}=?" for k in fields)
@@ -180,18 +169,21 @@ async def update_item_type(item_type_id: int, **fields) -> None:
 
 
 async def delete_item_type(item_type_id: int) -> None:
-    """Delete item type with *item_type_id*."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         await db.execute("DELETE FROM item_types WHERE id=?", (item_type_id,))
         await db.commit()
 
+
 # ---------------------------------------------------------------------------
 # Subject section enablement
 # ---------------------------------------------------------------------------
-async def set_subject_section_enable(subject_id: int, section_id: int,
-                                    *, is_enabled: bool = True,
-                                    sort_order: int = 0) -> None:
-    """Upsert ``subject_section_enable`` row for *subject_id*/*section_id*."""
+async def set_subject_section_enable(
+    subject_id: int,
+    section_id: int,
+    *,
+    is_enabled: bool = True,
+    sort_order: int = 0,
+) -> None:
     async with aiosqlite.connect(base.DB_PATH) as db:
         await db.execute(
             """INSERT INTO subject_section_enable
@@ -205,10 +197,27 @@ async def set_subject_section_enable(subject_id: int, section_id: int,
 
 
 async def get_enabled_sections_for_subject(subject_id: int) -> list[tuple]:
-    """Return enabled sections for *subject_id* ordered by ``sort_order``."""
     async with aiosqlite.connect(base.DB_PATH) as db:
         cur = await db.execute(
             "SELECT section_id, is_enabled, sort_order FROM subject_section_enable WHERE subject_id=? ORDER BY sort_order",
             (subject_id,),
         )
         return await cur.fetchall()
+
+
+__all__ = [
+    "create_section",
+    "get_section",
+    "update_section",
+    "delete_section",
+    "create_card",
+    "get_card",
+    "update_card",
+    "delete_card",
+    "create_item_type",
+    "get_item_type",
+    "update_item_type",
+    "delete_item_type",
+    "set_subject_section_enable",
+    "get_enabled_sections_for_subject",
+]
