@@ -1,62 +1,79 @@
-import asyncio
 import pytest
 
 from bot.parser.hashtags import parse_hashtags
-from bot.repo import hashtags, taxonomy
+from tests.helpers import TERM_RESOURCE_TAGS
 
 
-@pytest.fixture()
-def seed(repo_db):
-    async def _seed():
-        lecture_id = await taxonomy.create_item_type(
-            "lecture", "محاضرة", "Lecture", requires_lecture=True
-        )
-        video_id = await taxonomy.create_item_type(
-            "video", "فيديو", "Video", requires_lecture=False
-        )
-        aid = await hashtags.create_alias("lecture", "lecture")
-        await hashtags.create_mapping(aid, "item_type", lecture_id, is_content_tag=True)
-        aid = await hashtags.create_alias("video", "video")
-        await hashtags.create_mapping(aid, "item_type", video_id, is_content_tag=True)
-        await hashtags.create_alias("المحاضرة", "lecture_tag")
-    asyncio.run(_seed())
-    return repo_db
-
-
-@pytest.mark.anyio
-async def test_parse_hashtags_valid(seed):
-    text = "#lecture\n#1446\n#المحاضرة_1: العنوان"
-    info, error = await parse_hashtags(text)
+def test_parse_hashtags_accepts_full_lecture_sequence():
+    text = "\n".join(
+        [
+            "#lecture",
+            "#المحاضرة_1: العنوان",
+            "#1446",
+            "#الدكتور_فلان",
+        ]
+    )
+    info, error = parse_hashtags(text)
     assert error is None
     assert info.content_type == "lecture"
-    assert info.year == 1446
     assert info.lecture_no == 1
     assert info.title == "العنوان"
+    assert info.year == 1446
+    assert info.lecturer == "فلان"
 
 
-@pytest.mark.anyio
-async def test_parse_hashtags_multi_content(seed):
-    text = "#lecture\n#video"
-    _, error = await parse_hashtags(text)
-    assert error == "E-HT-MULTI"
+@pytest.mark.parametrize("kind, tags", TERM_RESOURCE_TAGS.items())
+def test_parse_hashtags_term_resources(kind, tags):
+    results = []
+    for tag in tags:
+        info, error = parse_hashtags(tag)
+        assert error is None
+        results.append(info.content_type)
+    assert set(results) == {kind}
 
 
-@pytest.mark.anyio
-async def test_parse_hashtags_missing_session(seed):
-    text = "#lecture\n#1446"
-    _, error = await parse_hashtags(text)
-    assert error == "E-NO-SESSION"
+@pytest.mark.parametrize(
+    "tag, expected",
+    [
+        ("#نظري", "theory"),
+        ("#مناقشة", "discussion"),
+        ("#مناقشه", "discussion"),
+        ("#عملي", "lab"),
+        ("#رحلة", "field_trip"),
+    ],
+)
+def test_parse_hashtags_section(tag, expected):
+    info, error = parse_hashtags(tag)
+    assert error is None
+    assert info.section == expected
 
 
-@pytest.mark.anyio
-async def test_parse_hashtags_no_content(seed):
-    text = "#1446\n#المحاضرة_1: العنوان"
-    _, error = await parse_hashtags(text)
-    assert error == "E-NO-CONTEXT"
+def test_parse_hashtags_glossary_new_alias():
+    info, error = parse_hashtags("#المفردات_الدرسية")
+    assert error is None
+    assert info.content_type == "glossary"
 
 
-@pytest.mark.anyio
-async def test_parse_hashtags_unknown_alias(seed):
-    text = "#lecture\n#مجهول"
-    _, error = await parse_hashtags(text)
-    assert error == "E-ALIAS-UNKNOWN"
+@pytest.mark.parametrize(
+    "tag, expected",
+    [
+        ("#التوصيف", "syllabus"),
+        ("#المفردات_الدراسية", "glossary"),
+        ("#الواقع_التطبيقي", "practical"),
+        ("#مراجع", "references"),
+        ("#مهارات", "skills"),
+        ("#مشاريع_مفتوحة_المصدر", "open_source_projects"),
+    ],
+    ids=[
+        "التوصيف",
+        "المفردات_الدراسية",
+        "الواقع_التطبيقي",
+        "مراجع",
+        "مهارات",
+        "مشاريع_مفتوحة_المصدر",
+    ],
+)
+def test_parse_hashtags_content_type(tag, expected):
+    info, error = parse_hashtags(tag)
+    assert error is None
+    assert info.content_type == expected

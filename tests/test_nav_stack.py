@@ -27,18 +27,3 @@ def test_nav_stack_basic_operations():
     assert stack.pop() is None
     assert stack.peek() is None
     assert stack.path_text() == ""
-
-
-def test_nav_stack_clears_on_bump():
-    user_data = {}
-    stack = NavStack(user_data, bump=1)
-    stack.push(("level", 1, "L1"))
-
-    # Reinitialising with same bump preserves stack
-    stack = NavStack(user_data, bump=1)
-    assert stack.path_text() == "L1"
-
-    # Different bump clears stored path
-    stack = NavStack(user_data, bump=2)
-    assert stack.path_text() == ""
-    assert user_data["nav_stack"] == []

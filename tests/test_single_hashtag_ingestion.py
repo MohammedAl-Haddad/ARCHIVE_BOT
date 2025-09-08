@@ -54,22 +54,6 @@ async def _prepare(monkeypatch, binding):
     async def fake_copy_message(*args, **kwargs):
         return None
 
-    async def fake_parse_hashtags(text):
-        return (
-            SimpleNamespace(
-                year=None,
-                content_type=None,
-                title="",
-                lecturer=None,
-                tags=["#التوصيف"],
-                lecture_no=None,
-            ),
-            None,
-        )
-
-    async def fake_classify_hashtag(tag):
-        return ("card", "syllabus")
-
     monkeypatch.setattr(ingestion, "insert_material", fake_insert_material)
     monkeypatch.setattr(ingestion, "insert_ingestion", fake_insert_ingestion)
     monkeypatch.setattr(ingestion, "attach_material", fake_attach_material)
@@ -79,15 +63,13 @@ async def _prepare(monkeypatch, binding):
     monkeypatch.setattr(ingestion, "find_exact", fake_find_exact)
     monkeypatch.setattr(ingestion, "send_ephemeral", fake_send_ephemeral)
     monkeypatch.setattr(ingestion, "get_file_unique_id_from_message", fake_get_file_unique_id_from_message)
-    monkeypatch.setattr(ingestion, "parse_hashtags", fake_parse_hashtags)
-    monkeypatch.setattr(ingestion, "classify_hashtag", fake_classify_hashtag)
 
     context = SimpleNamespace(user_data={}, bot=SimpleNamespace(copy_message=fake_copy_message))
 
     return insert_calls, attach_calls, sent_msgs, context
 
 
-async def test_single_card_in_topic(monkeypatch, repo_db):
+async def test_single_card_in_topic(monkeypatch):
     binding = {333: {"subject_id": 1, "section": "theory", "subject_name": "sub"}}
     insert_calls, attach_calls, _, context = await _prepare(monkeypatch, binding)
 
@@ -110,7 +92,7 @@ async def test_single_card_in_topic(monkeypatch, repo_db):
     assert attach_calls == [(99, 10, "pending")]
 
 
-async def test_single_card_general_chat_without_binding(monkeypatch, repo_db):
+async def test_single_card_general_chat_without_binding(monkeypatch):
     binding = {}
     insert_calls, attach_calls, sent_msgs, context = await _prepare(monkeypatch, binding)
 
@@ -134,7 +116,7 @@ async def test_single_card_general_chat_without_binding(monkeypatch, repo_db):
     assert sent_msgs and "يُرجى النشر داخل موضوع المادة الصحيح" in sent_msgs[0]
 
 
-async def test_single_card_general_chat_with_binding(monkeypatch, repo_db):
+async def test_single_card_general_chat_with_binding(monkeypatch):
     binding = {0: {"subject_id": 1, "section": None, "subject_name": "sub"}}
     insert_calls, attach_calls, _, context = await _prepare(monkeypatch, binding)
 

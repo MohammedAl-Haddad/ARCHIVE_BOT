@@ -2,7 +2,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler
 
 import logging
-import time
 
 from ..config import OWNER_TG_ID, config
 from ..db import (
@@ -21,17 +20,9 @@ from ..db.materials import insert_material, find_exact
 from bot.db.admins import is_owner
 from ..parser.hashtags import parse_hashtags, classify_hashtag
 from ..utils.telegram import send_ephemeral, get_file_unique_id_from_message
-from ..policies.sensitivity import policy as sensitivity_policy
 
 
 logger = logging.getLogger(__name__)
-
-FOLLOW_CMD = "//follow"
-END_CMD = "//end"
-CANCEL_CMD = "//cancel"
-CHAIN_TIMEOUT = 300
-
-CONFIRM_CMD = "//confirm"
 
 
 TERM_RESOURCE_TYPES = {
@@ -50,94 +41,9 @@ TERM_RESOURCE_TYPES = {
 
 async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
-    user = update.effective_user
-    chat = update.effective_chat
-    text = (message.caption or message.text or "").strip()
-
-    chat_data = getattr(context, "chat_data", None)
-    if chat_data is None:
-        chat_data = context.chat_data = {}
-    chains = chat_data.setdefault("follow_chains", {})
-    last_ing = chat_data.setdefault("last_ingestion", {})
-    overrides = chat_data.setdefault("phi_override", set())
-    key = (chat.id if chat else None, user.id if user else None)
-
-    now = time.time()
-    chain = chains.get(key)
-    if chain and chain["expires_at"] <= now:
-        chains.pop(key)
-        chain = None
-
-    if text == CONFIRM_CMD:
-        if user and is_owner(user):
-            overrides.add(user.id)
-            await send_ephemeral(
-                context,
-                chat.id,
-                "تم التأكيد للرسالة التالية فقط.",
-                reply_to_message_id=message.message_id,
-                message_thread_id=message.message_thread_id,
-            )
-        else:
-            await send_ephemeral(
-                context,
-                chat.id,
-                "ليس لديك صلاحية التأكيد.",
-                reply_to_message_id=message.message_id,
-                message_thread_id=message.message_thread_id,
-            )
-        return
-
-    if text in {FOLLOW_CMD, END_CMD, CANCEL_CMD}:
-        if text == FOLLOW_CMD:
-            if chain:
-                await send_ephemeral(
-                    context,
-                    chat.id,
-                    "سلسلة متابعة نشطة بالفعل.",
-                    reply_to_message_id=message.message_id,
-                    message_thread_id=message.message_thread_id,
-                )
-            else:
-                parent = last_ing.get(key)
-                if parent is None:
-                    await send_ephemeral(
-                        context,
-                        chat.id,
-                        "لا يوجد إدخال للمتابعة.",
-                        reply_to_message_id=message.message_id,
-                        message_thread_id=message.message_thread_id,
-                    )
-                else:
-                    chains[key] = {
-                        "chain_id": parent,
-                        "last_id": parent,
-                        "expires_at": now + CHAIN_TIMEOUT,
-                    }
-                    await send_ephemeral(
-                        context,
-                        chat.id,
-                        "تم بدء سلسلة المتابعة.",
-                        reply_to_message_id=message.message_id,
-                        message_thread_id=message.message_thread_id,
-                    )
-        else:
-            if chain:
-                chains.pop(key, None)
-                msg = "تم الإنهاء." if text == END_CMD else "تم الإلغاء."
-            else:
-                msg = "لا توجد سلسلة نشطة."
-            await send_ephemeral(
-                context,
-                chat.id,
-                msg,
-                reply_to_message_id=message.message_id,
-                message_thread_id=message.message_thread_id,
-            )
-        return
-
     file_unique_id = get_file_unique_id_from_message(message)
-    info, error = await parse_hashtags(text)
+    text = message.caption or message.text or ""
+    info, error = parse_hashtags(text)
     if error:
         await send_ephemeral(
             context,
@@ -155,7 +61,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     tags = info.tags or []
     single_kind = single_code = None
     if len(tags) == 1:
-        single_kind, single_code = await classify_hashtag(tags[0])
+        single_kind, single_code = classify_hashtag(tags[0])
 
     lecture_attachment_categories = [
         "board_images",
@@ -175,6 +81,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         lecture_title = title
 
+    user = update.effective_user
     if not user:
         logger.warning("No effective user on update")
         if message:
@@ -210,6 +117,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
+    chat = update.effective_chat
     thread_id = message.message_thread_id if message else None
     if chat is None:
         logger.warning("Missing chat %s", chat)
@@ -314,30 +222,6 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
-    file_name = getattr(getattr(message, "document", None), "file_name", None)
-    if sensitivity_policy.is_sensitive(text, filename=file_name, section=section or category):
-        if user and user.id in overrides:
-            overrides.remove(user.id)
-            logger.info("Sensitive override by %s", user.id)
-        else:
-            logger.warning("E-PHI-BLOCK user=%s msg=%s", user.id if user else None, message.message_id)
-            await send_ephemeral(
-                context,
-                chat.id,
-                "❌ تم حظر المحتوى الحساس (E-PHI-BLOCK).",
-                reply_to_message_id=message.message_id,
-                message_thread_id=thread_id,
-            )
-            if user and is_owner(user):
-                await send_ephemeral(
-                    context,
-                    chat.id,
-                    "أرسل //confirm ثم أعد الإرسال لتجاوز التحذير.",
-                    reply_to_message_id=message.message_id,
-                    message_thread_id=thread_id,
-                )
-            return
-
     year_id = await get_or_create_year(str(year)) if year else None
     lecturer_id = (
         await get_or_create_lecturer(lecturer_name) if lecturer_name else None
@@ -425,24 +309,9 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 created_by_admin_id=admin_id,
             )
 
-    chain = chains.get(key)
-    if chain:
-        ingestion_id = await insert_ingestion(
-            message.message_id,
-            admin_id,
-            file_unique_id=file_unique_id,
-            chain_id=chain["chain_id"],
-            parent_ingestion_id=chain["last_id"],
-        )
-        chain["last_id"] = ingestion_id
-        chain["expires_at"] = time.time() + CHAIN_TIMEOUT
-        last_ing[key] = ingestion_id
-    else:
-        ingestion_id = await insert_ingestion(
-            message.message_id, admin_id, file_unique_id=file_unique_id
-        )
-        last_ing[key] = ingestion_id
-
+    ingestion_id = await insert_ingestion(
+        message.message_id, admin_id, file_unique_id=file_unique_id
+    )
     await attach_material(ingestion_id, material_id, "pending")
     await send_ephemeral(
         context,

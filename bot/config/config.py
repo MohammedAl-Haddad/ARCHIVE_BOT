@@ -61,7 +61,7 @@ class Config:
 
         version = os.getenv("COMMIT_SHA", "dev")
         start_time = datetime.now()
-        per_page = cls._to_int("PER_PAGE", required=False) or 12
+        per_page = cls._to_int("PER_PAGE", required=False) or 8
         nav_tree_enabled = cls._to_bool("NAV_TREE_ENABLED")
         nav_tree_shadow = cls._to_bool("NAV_TREE_SHADOW")
 
