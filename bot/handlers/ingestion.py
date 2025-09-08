@@ -21,6 +21,7 @@ from ..db.materials import insert_material, find_exact
 from bot.db.admins import is_owner
 from ..parser.hashtags import parse_hashtags, classify_hashtag
 from ..utils.telegram import send_ephemeral, get_file_unique_id_from_message
+from ..policies.sensitivity import policy as sensitivity_policy
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,8 @@ FOLLOW_CMD = "//follow"
 END_CMD = "//end"
 CANCEL_CMD = "//cancel"
 CHAIN_TIMEOUT = 300
+
+CONFIRM_CMD = "//confirm"
 
 
 TERM_RESOURCE_TYPES = {
@@ -56,6 +59,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         chat_data = context.chat_data = {}
     chains = chat_data.setdefault("follow_chains", {})
     last_ing = chat_data.setdefault("last_ingestion", {})
+    overrides = chat_data.setdefault("phi_override", set())
     key = (chat.id if chat else None, user.id if user else None)
 
     now = time.time()
@@ -63,6 +67,26 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if chain and chain["expires_at"] <= now:
         chains.pop(key)
         chain = None
+
+    if text == CONFIRM_CMD:
+        if user and is_owner(user):
+            overrides.add(user.id)
+            await send_ephemeral(
+                context,
+                chat.id,
+                "تم التأكيد للرسالة التالية فقط.",
+                reply_to_message_id=message.message_id,
+                message_thread_id=message.message_thread_id,
+            )
+        else:
+            await send_ephemeral(
+                context,
+                chat.id,
+                "ليس لديك صلاحية التأكيد.",
+                reply_to_message_id=message.message_id,
+                message_thread_id=message.message_thread_id,
+            )
+        return
 
     if text in {FOLLOW_CMD, END_CMD, CANCEL_CMD}:
         if text == FOLLOW_CMD:
@@ -289,6 +313,30 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message_thread_id=thread_id,
         )
         return
+
+    file_name = getattr(getattr(message, "document", None), "file_name", None)
+    if sensitivity_policy.is_sensitive(text, filename=file_name, section=section or category):
+        if user and user.id in overrides:
+            overrides.remove(user.id)
+            logger.info("Sensitive override by %s", user.id)
+        else:
+            logger.warning("E-PHI-BLOCK user=%s msg=%s", user.id if user else None, message.message_id)
+            await send_ephemeral(
+                context,
+                chat.id,
+                "❌ تم حظر المحتوى الحساس (E-PHI-BLOCK).",
+                reply_to_message_id=message.message_id,
+                message_thread_id=thread_id,
+            )
+            if user and is_owner(user):
+                await send_ephemeral(
+                    context,
+                    chat.id,
+                    "أرسل //confirm ثم أعد الإرسال لتجاوز التحذير.",
+                    reply_to_message_id=message.message_id,
+                    message_thread_id=thread_id,
+                )
+            return
 
     year_id = await get_or_create_year(str(year)) if year else None
     lecturer_id = (
