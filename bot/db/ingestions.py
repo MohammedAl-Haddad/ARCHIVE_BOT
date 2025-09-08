@@ -9,16 +9,27 @@ async def insert_ingestion(
     status: str = "pending",
     action: str = "add",
     file_unique_id: str | None = None,
+    chain_id: int | None = None,
+    parent_ingestion_id: int | None = None,
 ) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute(
             """
             INSERT INTO ingestions (
-                tg_message_id, admin_id, status, action, file_unique_id
+                tg_message_id, admin_id, status, action, file_unique_id,
+                chain_id, parent_ingestion_id
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (tg_message_id, admin_id, status, action, file_unique_id),
+            (
+                tg_message_id,
+                admin_id,
+                status,
+                action,
+                file_unique_id,
+                chain_id,
+                parent_ingestion_id,
+            ),
         )
         await db.commit()
         return cur.lastrowid
