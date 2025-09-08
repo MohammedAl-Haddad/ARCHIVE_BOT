@@ -40,55 +40,50 @@ async def export_taxonomy(*, include_presets: bool = False) -> dict[str, Any]:
     async with aiosqlite.connect(base.DB_PATH) as db:
         # Sections
         cur = await db.execute(
-            "SELECT key, label_ar, label_en, is_enabled, sort_order FROM sections ORDER BY id"
+            "SELECT id, label_ar, label_en, is_enabled, sort_order, created_at, updated_at FROM sections ORDER BY id"
         )
         rows = await cur.fetchall()
         data["sections"] = [
             {
-                "key": r[0],
+                "id": r[0],
                 "label_ar": r[1],
                 "label_en": r[2],
                 "is_enabled": r[3],
                 "sort_order": r[4],
+                "created_at": r[5],
+                "updated_at": r[6],
             }
             for r in rows
         ]
 
-        # Cards – join with sections to export section key
+        # Cards
         cur = await db.execute(
-            """
-            SELECT c.key, c.label_ar, c.label_en, s.key, c.show_when_empty,
-                   c.is_enabled, c.sort_order
-            FROM cards c LEFT JOIN sections s ON c.section_id = s.id
-            ORDER BY c.id
-            """
+            "SELECT id, section_id, label_ar, label_en, show_when_empty, is_enabled, sort_order, created_at, updated_at FROM cards ORDER BY id"
         )
         rows = await cur.fetchall()
         data["cards"] = [
             {
-                "key": r[0],
-                "label_ar": r[1],
-                "label_en": r[2],
-                "section": r[3],
+                "id": r[0],
+                "section_id": r[1],
+                "label_ar": r[2],
+                "label_en": r[3],
                 "show_when_empty": r[4],
                 "is_enabled": r[5],
                 "sort_order": r[6],
+                "created_at": r[7],
+                "updated_at": r[8],
             }
             for r in rows
         ]
 
         # Item types
         cur = await db.execute(
-            """
-            SELECT key, label_ar, label_en, requires_lecture, allows_year,
-                   allows_lecturer, is_enabled, sort_order
-            FROM item_types ORDER BY id
-            """
+            "SELECT id, label_ar, label_en, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order, created_at, updated_at FROM item_types ORDER BY id"
         )
         rows = await cur.fetchall()
         data["item_types"] = [
             {
-                "key": r[0],
+                "id": r[0],
                 "label_ar": r[1],
                 "label_en": r[2],
                 "requires_lecture": r[3],
@@ -96,6 +91,8 @@ async def export_taxonomy(*, include_presets: bool = False) -> dict[str, Any]:
                 "allows_lecturer": r[5],
                 "is_enabled": r[6],
                 "sort_order": r[7],
+                "created_at": r[8],
+                "updated_at": r[9],
             }
             for r in rows
         ]
@@ -135,22 +132,19 @@ async def export_taxonomy(*, include_presets: bool = False) -> dict[str, Any]:
             for r in rows
         ]
 
-        # Subject section enable – export using section key
+        # Subject section enable
         cur = await db.execute(
-            """
-            SELECT e.subject_id, s.key, e.is_enabled, e.sort_order
-            FROM subject_section_enable e
-            JOIN sections s ON s.id = e.section_id
-            ORDER BY e.subject_id, s.key
-            """
+            "SELECT subject_id, section_id, is_enabled, sort_order, created_at, updated_at FROM subject_section_enable ORDER BY subject_id, section_id"
         )
         rows = await cur.fetchall()
         data["subject_section_enable"] = [
             {
                 "subject_id": r[0],
-                "section": r[1],
+                "section_id": r[1],
                 "is_enabled": r[2],
                 "sort_order": r[3],
+                "created_at": r[4],
+                "updated_at": r[5],
             }
             for r in rows
         ]
@@ -198,9 +192,10 @@ async def import_taxonomy(
     async with aiosqlite.connect(base.DB_PATH) as db:
         # Sections -----------------------------------------------------------------
         for sec in data.get("sections", []):
+            sid = sec["id"]
             cur = await db.execute(
-                "SELECT label_ar, label_en, is_enabled, sort_order FROM sections WHERE key=?",
-                (sec["key"],),
+                "SELECT label_ar, label_en, is_enabled, sort_order FROM sections WHERE id=?",
+                (sid,),
             )
             row = await cur.fetchone()
             incoming = (
@@ -210,13 +205,13 @@ async def import_taxonomy(
                 sec.get("sort_order", 0),
             )
             if row is None:
-                report["add"]["sections"].append(sec["key"])
+                report["add"]["sections"].append(sid)
 
                 async def _op(sec=sec) -> None:
                     await db.execute(
-                        "INSERT INTO sections (key, label_ar, label_en, is_enabled, sort_order) VALUES (?, ?, ?, ?, ?)",
+                        "INSERT INTO sections (id, label_ar, label_en, is_enabled, sort_order) VALUES (?, ?, ?, ?, ?)",
                         (
-                            sec["key"],
+                            sec["id"],
                             sec.get("label_ar"),
                             sec.get("label_en"),
                             sec.get("is_enabled", 1),
@@ -229,19 +224,19 @@ async def import_taxonomy(
                 existing = row
                 if existing != incoming:
                     if strict:
-                        report["conflicts"]["sections"].append(sec["key"])
+                        report["conflicts"]["sections"].append(sid)
                     else:
-                        report["update"]["sections"].append(sec["key"])
+                        report["update"]["sections"].append(sid)
 
                         async def _op(sec=sec) -> None:
                             await db.execute(
-                                "UPDATE sections SET label_ar=?, label_en=?, is_enabled=?, sort_order=? WHERE key=?",
+                                "UPDATE sections SET label_ar=?, label_en=?, is_enabled=?, sort_order=? WHERE id=?",
                                 (
                                     sec.get("label_ar"),
                                     sec.get("label_en"),
                                     sec.get("is_enabled", 1),
                                     sec.get("sort_order", 0),
-                                    sec["key"],
+                                    sec["id"],
                                 ),
                             )
 
@@ -249,44 +244,33 @@ async def import_taxonomy(
 
         # Cards --------------------------------------------------------------------
         for card in data.get("cards", []):
+            cid = card["id"]
             cur = await db.execute(
-                """
-                SELECT c.label_ar, c.label_en, s.key, c.show_when_empty,
-                       c.is_enabled, c.sort_order
-                FROM cards c LEFT JOIN sections s ON c.section_id = s.id
-                WHERE c.key=?
-                """,
-                (card["key"],),
+                "SELECT label_ar, label_en, section_id, show_when_empty, is_enabled, sort_order FROM cards WHERE id=?",
+                (cid,),
             )
             row = await cur.fetchone()
             incoming = (
                 card.get("label_ar"),
                 card.get("label_en"),
-                card.get("section"),
+                card.get("section_id"),
                 card.get("show_when_empty", 0),
                 card.get("is_enabled", 1),
                 card.get("sort_order", 0),
             )
-            # resolve section id for operations
-            section_key = card.get("section")
-            section_id = None
-            if section_key is not None:
-                cur = await db.execute("SELECT id FROM sections WHERE key=?", (section_key,))
-                sec_row = await cur.fetchone()
-                section_id = sec_row[0] if sec_row else None
             if row is None:
-                report["add"]["cards"].append(card["key"])
+                report["add"]["cards"].append(cid)
 
-                async def _op(card=card, section_id=section_id) -> None:
+                async def _op(card=card) -> None:
                     await db.execute(
                         """INSERT INTO cards
-                            (key, label_ar, label_en, section_id, show_when_empty, is_enabled, sort_order)
+                            (id, section_id, label_ar, label_en, show_when_empty, is_enabled, sort_order)
                             VALUES (?, ?, ?, ?, ?, ?, ?)""",
                         (
-                            card["key"],
+                            card["id"],
+                            card.get("section_id"),
                             card.get("label_ar"),
                             card.get("label_en"),
-                            section_id,
                             card.get("show_when_empty", 0),
                             card.get("is_enabled", 1),
                             card.get("sort_order", 0),
@@ -298,22 +282,22 @@ async def import_taxonomy(
                 existing = row
                 if existing != incoming:
                     if strict:
-                        report["conflicts"]["cards"].append(card["key"])
+                        report["conflicts"]["cards"].append(cid)
                     else:
-                        report["update"]["cards"].append(card["key"])
+                        report["update"]["cards"].append(cid)
 
-                        async def _op(card=card, section_id=section_id) -> None:
+                        async def _op(card=card) -> None:
                             await db.execute(
-                                """UPDATE cards SET label_ar=?, label_en=?, section_id=?, show_when_empty=?,
-                                       is_enabled=?, sort_order=? WHERE key=?""",
+                                """UPDATE cards SET section_id=?, label_ar=?, label_en=?, show_when_empty=?,
+                                       is_enabled=?, sort_order=? WHERE id=?""",
                                 (
+                                    card.get("section_id"),
                                     card.get("label_ar"),
                                     card.get("label_en"),
-                                    section_id,
                                     card.get("show_when_empty", 0),
                                     card.get("is_enabled", 1),
                                     card.get("sort_order", 0),
-                                    card["key"],
+                                    card["id"],
                                 ),
                             )
 
@@ -321,13 +305,11 @@ async def import_taxonomy(
 
         # Item types ----------------------------------------------------------------
         for item in data.get("item_types", []):
+            iid = item["id"]
             cur = await db.execute(
-                """
-                SELECT label_ar, label_en, requires_lecture, allows_year,
-                       allows_lecturer, is_enabled, sort_order
-                FROM item_types WHERE key=?
-                """,
-                (item["key"],),
+                """SELECT label_ar, label_en, requires_lecture, allows_year,
+                       allows_lecturer, is_enabled, sort_order FROM item_types WHERE id=?""",
+                (iid,),
             )
             row = await cur.fetchone()
             incoming = (
@@ -340,15 +322,15 @@ async def import_taxonomy(
                 item.get("sort_order", 0),
             )
             if row is None:
-                report["add"]["item_types"].append(item["key"])
+                report["add"]["item_types"].append(iid)
 
                 async def _op(item=item) -> None:
                     await db.execute(
                         """INSERT INTO item_types
-                            (key, label_ar, label_en, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order)
+                            (id, label_ar, label_en, requires_lecture, allows_year, allows_lecturer, is_enabled, sort_order)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
-                            item["key"],
+                            item["id"],
                             item.get("label_ar"),
                             item.get("label_en"),
                             item.get("requires_lecture", 0),
@@ -364,14 +346,14 @@ async def import_taxonomy(
                 existing = row
                 if existing != incoming:
                     if strict:
-                        report["conflicts"]["item_types"].append(item["key"])
+                        report["conflicts"]["item_types"].append(iid)
                     else:
-                        report["update"]["item_types"].append(item["key"])
+                        report["update"]["item_types"].append(iid)
 
                         async def _op(item=item) -> None:
                             await db.execute(
                                 """UPDATE item_types SET label_ar=?, label_en=?, requires_lecture=?,
-                                       allows_year=?, allows_lecturer=?, is_enabled=?, sort_order=? WHERE key=?""",
+                                       allows_year=?, allows_lecturer=?, is_enabled=?, sort_order=? WHERE id=?""",
                                 (
                                     item.get("label_ar"),
                                     item.get("label_en"),
@@ -380,7 +362,7 @@ async def import_taxonomy(
                                     item.get("allows_lecturer", 1),
                                     item.get("is_enabled", 1),
                                     item.get("sort_order", 0),
-                                    item["key"],
+                                    item["id"],
                                 ),
                             )
 
@@ -480,32 +462,27 @@ async def import_taxonomy(
 
         # Subject section enable ----------------------------------------------------
         for row in data.get("subject_section_enable", []):
-            section_key = row["section"]
-            cur = await db.execute("SELECT id FROM sections WHERE key=?", (section_key,))
-            sec_row = await cur.fetchone()
-            section_id = sec_row[0] if sec_row else None
             cur = await db.execute(
-                """SELECT is_enabled, sort_order FROM subject_section_enable
-                    WHERE subject_id=? AND section_id=?""",
-                (row["subject_id"], section_id),
+                "SELECT is_enabled, sort_order FROM subject_section_enable WHERE subject_id=? AND section_id=?",
+                (row["subject_id"], row["section_id"]),
             )
             existing = await cur.fetchone()
             incoming = (
                 row.get("is_enabled", 1),
                 row.get("sort_order", 0),
             )
-            ident = f"{row['subject_id']}:{section_key}"
+            ident = f"{row['subject_id']}:{row['section_id']}"
             if existing is None:
                 report["add"]["subject_section_enable"].append(ident)
 
-                async def _op(row=row, section_id=section_id) -> None:
+                async def _op(row=row) -> None:
                     await db.execute(
                         """INSERT INTO subject_section_enable
                             (subject_id, section_id, is_enabled, sort_order)
                             VALUES (?, ?, ?, ?)""",
                         (
                             row["subject_id"],
-                            section_id,
+                            row.get("section_id"),
                             row.get("is_enabled", 1),
                             row.get("sort_order", 0),
                         ),
@@ -519,7 +496,7 @@ async def import_taxonomy(
                     else:
                         report["update"]["subject_section_enable"].append(ident)
 
-                        async def _op(row=row, section_id=section_id) -> None:
+                        async def _op(row=row) -> None:
                             await db.execute(
                                 """UPDATE subject_section_enable SET is_enabled=?, sort_order=?
                                        WHERE subject_id=? AND section_id=?""",
@@ -527,7 +504,7 @@ async def import_taxonomy(
                                     row.get("is_enabled", 1),
                                     row.get("sort_order", 0),
                                     row["subject_id"],
-                                    section_id,
+                                    row.get("section_id"),
                                 ),
                             )
 

@@ -20,6 +20,7 @@ from ..db.materials import insert_material, find_exact
 from bot.db.admins import is_owner
 from ..parser.hashtags import parse_hashtags, classify_hashtag
 from ..utils.telegram import send_ephemeral, get_file_unique_id_from_message
+from ..policies.sensitivity import policy as sensitivity_policy
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     message = update.effective_message
     file_unique_id = get_file_unique_id_from_message(message)
     text = message.caption or message.text or ""
-    info, error = parse_hashtags(text)
+    info, error = await parse_hashtags(text)
     if error:
         await send_ephemeral(
             context,

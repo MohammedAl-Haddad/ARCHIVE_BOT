@@ -30,38 +30,43 @@ def repo_db(tmp_path, monkeypatch):
                 """
                 CREATE TABLE sections (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE,
                     label_ar TEXT,
                     label_en TEXT,
                     is_enabled INTEGER,
-                    sort_order INTEGER
+                    sort_order INTEGER,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE TABLE cards (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE,
+                    section_id INTEGER,
                     label_ar TEXT,
                     label_en TEXT,
-                    section_id INTEGER,
                     show_when_empty INTEGER,
                     is_enabled INTEGER,
-                    sort_order INTEGER
+                    sort_order INTEGER,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE TABLE item_types (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE,
                     label_ar TEXT,
                     label_en TEXT,
                     requires_lecture INTEGER,
                     allows_year INTEGER,
                     allows_lecturer INTEGER,
                     is_enabled INTEGER,
-                    sort_order INTEGER
+                    sort_order INTEGER,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE TABLE subject_section_enable (
                     subject_id INTEGER,
                     section_id INTEGER,
                     is_enabled INTEGER,
                     sort_order INTEGER,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY(subject_id, section_id)
                 );
                 CREATE TABLE hashtag_aliases (
