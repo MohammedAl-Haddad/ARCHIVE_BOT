@@ -18,7 +18,7 @@ def test_card_crud(repo_db):
     section_id = asyncio.run(taxonomy.create_section("عملي", "Lab"))
     cid = asyncio.run(taxonomy.create_card("سلايدات", "Slides", section_id=section_id))
     row = asyncio.run(taxonomy.get_card(cid))
-    assert row[0] == cid
+    assert row[0] == cid and row[1] == section_id
     asyncio.run(taxonomy.update_card(cid, label_en="Slides Updated"))
     row = asyncio.run(taxonomy.get_card(cid))
     assert row[3] == "Slides Updated"
