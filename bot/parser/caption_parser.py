@@ -10,7 +10,13 @@ containers so the rest of the codebase can interact with a stable API.
 """
 
 from dataclasses import dataclass
+import re
 from typing import List, Optional, Tuple
+
+from ..repo.hashtags import normalize_alias
+
+BIDI_RE = re.compile(r"[\u200e\u200f\u202a-\u202e]")
+HASHTAG_RE = re.compile(r"#([^\s#]+)")
 
 
 @dataclass
@@ -40,17 +46,26 @@ async def parse_message(
 ) -> Tuple[ParseResult, Optional[ParseError]]:
     """Parse *message_text* and return ``(result, error)``.
 
-    This is a placeholder implementation that simply returns the input wrapped
-    in :class:`ParseResult` with ``error`` set to ``None``.  It establishes a
-    consistent interface for future, more sophisticated caption parsing logic.
+    Extract hashtags using :data:`HASHTAG_RE`, normalise Arabic digits and
+    case using :func:`normalize_alias`, and remove direction markers so the
+    comparison is case and direction insensitive.
     """
+
+    clean_text = BIDI_RE.sub("", message_text)
+    seen: set[str] = set()
+    tags: List[str] = []
+    for tag in HASHTAG_RE.findall(clean_text):
+        normalized = normalize_alias(tag)
+        if normalized not in seen:
+            seen.add(normalized)
+            tags.append(normalized)
 
     result = ParseResult(
         text=message_text,
         group_id=group_id,
         tg_topic_id=tg_topic_id,
         locale=user_locale,
-        hashtags=None,
+        hashtags=tags or None,
     )
     return result, None
 
