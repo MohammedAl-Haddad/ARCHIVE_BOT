@@ -220,45 +220,118 @@ async def find_by_hash(content_hash: str) -> dict | None:
 
 
 @translate_errors
-async def count_by_subject(subject_id: int) -> int:
-    """Return number of materials for a subject."""
+async def count_by_subject(subject_id: int, *, include_disabled: bool = False) -> int:
+    """Return number of materials for a subject.
+
+    By default materials linked to disabled taxonomy elements are ignored unless
+    ``include_disabled`` is ``True``.
+    """
+
+    query = (
+        """
+        SELECT COUNT(*) FROM materials AS m
+        LEFT JOIN subject_section_enable AS sse
+            ON sse.subject_id = m.subject_id AND sse.section_id = m.section_id
+        LEFT JOIN sections AS s ON s.id = m.section_id
+        LEFT JOIN cards AS c ON c.id = m.category_id
+        LEFT JOIN section_item_types AS sit
+            ON sit.section_id = m.section_id AND sit.item_type_id = m.item_type_id
+        LEFT JOIN item_types AS it ON it.id = m.item_type_id
+        WHERE m.subject_id=?
+        """
+    )
+    params = [subject_id]
+    if not include_disabled:
+        query += (
+            " AND (s.is_enabled=1 OR s.id IS NULL)"
+            " AND (c.is_enabled=1 OR c.id IS NULL)"
+            " AND (it.is_enabled=1 OR it.id IS NULL)"
+            " AND (sse.is_enabled=1 OR sse.subject_id IS NULL)"
+            " AND (sit.is_enabled=1 OR sit.section_id IS NULL)"
+        )
 
     async with connect() as db:
-        cur = await db.execute(
-            "SELECT COUNT(*) FROM materials WHERE subject_id=?",
-            (subject_id,),
-        )
+        cur = await db.execute(query, params)
         (count,) = await cur.fetchone()
     return count
 
 
 @translate_errors
-async def count_by_section(subject_id: int, section_id: int) -> int:
-    """Return number of materials for a subject-section pair."""
+async def count_by_section(
+    subject_id: int, section_id: int, *, include_disabled: bool = False
+) -> int:
+    """Return number of materials for a subject-section pair.
+
+    Disabled taxonomy links are ignored unless ``include_disabled`` is ``True``.
+    """
+
+    query = (
+        """
+        SELECT COUNT(*) FROM materials AS m
+        LEFT JOIN subject_section_enable AS sse
+            ON sse.subject_id = m.subject_id AND sse.section_id = m.section_id
+        LEFT JOIN sections AS s ON s.id = m.section_id
+        LEFT JOIN cards AS c ON c.id = m.category_id
+        LEFT JOIN section_item_types AS sit
+            ON sit.section_id = m.section_id AND sit.item_type_id = m.item_type_id
+        LEFT JOIN item_types AS it ON it.id = m.item_type_id
+        WHERE m.subject_id=? AND m.section_id=?
+        """
+    )
+    params = [subject_id, section_id]
+    if not include_disabled:
+        query += (
+            " AND (s.is_enabled=1 OR s.id IS NULL)"
+            " AND (c.is_enabled=1 OR c.id IS NULL)"
+            " AND (it.is_enabled=1 OR it.id IS NULL)"
+            " AND (sse.is_enabled=1 OR sse.subject_id IS NULL)"
+            " AND (sit.is_enabled=1 OR sit.section_id IS NULL)"
+        )
 
     async with connect() as db:
-        cur = await db.execute(
-            "SELECT COUNT(*) FROM materials WHERE subject_id=? AND section_id=?",
-            (subject_id, section_id),
-        )
+        cur = await db.execute(query, params)
         (count,) = await cur.fetchone()
     return count
 
 
 @translate_errors
 async def count_by_item_type(
-    subject_id: int, section_id: int, item_type_id: int
+    subject_id: int,
+    section_id: int,
+    item_type_id: int,
+    *,
+    include_disabled: bool = False,
 ) -> int:
-    """Return number of materials for a subject-section-item_type tuple."""
+    """Return number of materials for a subject-section-item_type tuple.
+
+    Disabled taxonomy links are ignored unless ``include_disabled`` is ``True``.
+    """
+
+    query = (
+        """
+        SELECT COUNT(*) FROM materials AS m
+        LEFT JOIN subject_section_enable AS sse
+            ON sse.subject_id = m.subject_id AND sse.section_id = m.section_id
+        LEFT JOIN sections AS s ON s.id = m.section_id
+        LEFT JOIN cards AS c ON c.id = m.category_id
+        LEFT JOIN section_item_types AS sit
+            ON sit.section_id = m.section_id AND sit.item_type_id = m.item_type_id
+        LEFT JOIN item_types AS it ON it.id = m.item_type_id
+        WHERE m.subject_id=? AND m.section_id=? AND m.item_type_id=?
+        """
+    )
+    params = [subject_id, section_id, item_type_id]
+    if not include_disabled:
+        query += (
+            " AND (s.is_enabled=1 OR s.id IS NULL)"
+            " AND (c.is_enabled=1 OR c.id IS NULL)"
+            " AND (it.is_enabled=1 OR it.id IS NULL)"
+            " AND (sse.is_enabled=1 OR sse.subject_id IS NULL)"
+            " AND (sit.is_enabled=1 OR sit.section_id IS NULL)"
+        )
 
     async with connect() as db:
-        cur = await db.execute(
-            """
-            SELECT COUNT(*) FROM materials
-            WHERE subject_id=? AND section_id=? AND item_type_id=?
-            """,
-            (subject_id, section_id, item_type_id),
-        )
+        cur = await db.execute(query, params)
         (count,) = await cur.fetchone()
     return count
 

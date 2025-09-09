@@ -121,6 +121,18 @@ def test_count_queries(repo_db):
     assert _run(materials.count_by_section(1, sid)) == 2
     assert _run(materials.count_by_item_type(1, sid, iid1)) == 1
 
+    # disabling the section hides counts unless include_disabled=True
+    _run(taxonomy.set_subject_section_enable(1, sid, is_enabled=False))
+    assert _run(materials.count_by_subject(1)) == 0
+    assert _run(materials.count_by_subject(1, include_disabled=True)) == 2
+    assert _run(materials.count_by_section(1, sid)) == 0
+    assert _run(materials.count_by_section(1, sid, include_disabled=True)) == 2
+    assert _run(materials.count_by_item_type(1, sid, iid1)) == 0
+    assert (
+        _run(materials.count_by_item_type(1, sid, iid1, include_disabled=True))
+        == 1
+    )
+
 
 def test_get_materials_filters_and_enable(repo_db):
     sid = _run(taxonomy.create_section("نظري", "Theory"))["id"]
