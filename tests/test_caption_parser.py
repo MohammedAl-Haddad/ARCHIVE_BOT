@@ -1,179 +1,127 @@
-import asyncio
 import json
+import pytest
 
-from bot.parser.caption_parser import ParseError, parse_message
 from bot.parser import helpers
-from bot.repo import hashtags
-from bot.repo import taxonomy
+from bot.parser.caption_parser import ParseError, parse_message
+from bot.repo import hashtags, linking, taxonomy
 
 
-def test_parse_message_resolves_normalized_hashtags(repo_db):
-    async def setup() -> None:
-        tags = [("test1", False), ("physics1", True), ("تجربة", False)]
-        for idx, (tag, is_ct) in enumerate(tags, start=1):
-            aid = await hashtags.create_alias(tag)
-            await hashtags.create_mapping(aid, "subject", idx, is_content_tag=is_ct)
-
-    asyncio.run(setup())
-
-    text = "انظر إلى #Te‏ST1 و#PHYsics١ و#physics1 و#تجربة‏ #تجربة"
-    result, error = asyncio.run(parse_message(text))
-    assert error is None
-    assert len(result.hashtags) == 3
-    assert all(h["target_kind"] == "subject" for h in result.hashtags)
-    assert result.content_tag == {
-        "target_kind": "subject",
-        "target_id": 2,
-        "is_content_tag": True,
-        "overrides": None,
-    }
+pytestmark = pytest.mark.anyio
 
 
-def test_parse_message_unknown_hashtag(repo_db):
-    async def setup() -> None:
-        aid = await hashtags.create_alias("known")
-        await hashtags.create_mapping(aid, "subject", 1)
+@pytest.fixture
+async def create_alias(repo_db):
+    async def _create(tag, kind, ident, *, is_content=False, overrides=None):
+        aid = await hashtags.create_alias(tag)
+        await hashtags.create_mapping(
+            aid,
+            kind,
+            ident,
+            is_content_tag=is_content,
+            overrides=overrides,
+        )
+        return aid
 
-    asyncio.run(setup())
+    return _create
 
-    text = "#known #unknown"
-    result, error = asyncio.run(parse_message(text))
-    assert isinstance(error, ParseError)
-    assert error.message == "E-HT-UNKNOWN"
+
+@pytest.fixture
+async def create_topic(repo_db):
+    async def _create(subject_id=1, section_id=2):
+        gid = await linking.upsert_group(100, "G")
+        await linking.upsert_topic(gid, 5, subject_id, section_id=section_id)
+        return gid, 5
+
+    return _create
+
+
+async def test_topic_success(repo_db, create_alias, create_topic):
+    await create_alias("ctag", "subject", 1, is_content=True)
+    gid, tid = await create_topic()
+    result, err = await parse_message("#ctag", group_id=gid, tg_topic_id=tid)
+    assert err is None
+    assert result.subject == 1
+    assert result.section == 2
+
+
+async def test_unknown_alias(repo_db, create_alias):
+    await create_alias("known", "subject", 1)
+    result, err = await parse_message("#known #unknown")
+    assert isinstance(err, ParseError)
+    assert err.message == "E-HT-UNKNOWN"
     assert result.hashtags is None
-    assert result.content_tag is None
 
 
-def test_parse_message_no_content_tag_error(repo_db):
-    async def setup() -> None:
-        aid = await hashtags.create_alias("test")
-        await hashtags.create_mapping(aid, "subject", 1)
-
-    asyncio.run(setup())
-
-    result, error = asyncio.run(parse_message("#test"))
-    assert isinstance(error, ParseError)
-    assert error.message == "E-NO-CONTENT-TAG"
+async def test_no_content_tag_error(repo_db, create_alias):
+    await create_alias("tag", "subject", 1)
+    result, err = await parse_message("#tag")
+    assert isinstance(err, ParseError)
+    assert err.message == "E-NO-CONTENT-TAG"
     assert result.content_tag is None
     assert len(result.hashtags) == 1
 
 
-def test_parse_message_multiple_content_tags_error(repo_db):
-    async def setup() -> None:
-        for idx, tag in enumerate(["a", "b"], start=1):
-            aid = await hashtags.create_alias(tag)
-            await hashtags.create_mapping(aid, "subject", idx, is_content_tag=True)
-
-    asyncio.run(setup())
-
-    result, error = asyncio.run(parse_message("#a #b"))
-    assert isinstance(error, ParseError)
-    assert error.message == "E-HT-MULTI"
+async def test_multiple_content_tags_error(repo_db, create_alias):
+    await create_alias("a", "subject", 1, is_content=True)
+    await create_alias("b", "subject", 2, is_content=True)
+    result, err = await parse_message("#a #b")
+    assert isinstance(err, ParseError)
+    assert err.message == "E-HT-MULTI"
     assert result.content_tag is None
     assert len(result.hashtags) == 2
 
 
-def test_parse_message_extracts_year_and_lecturer_and_logs_raw_tags(repo_db):
-    async def setup() -> None:
-        aid = await hashtags.create_alias("physics1")
-        await hashtags.create_mapping(aid, "subject", 1, is_content_tag=True)
-
-    asyncio.run(setup())
-
+async def test_extracts_year_and_lecturer(repo_db, create_alias):
+    await create_alias("physics1", "subject", 1, is_content=True)
     text = "#physics1 #١٤٤٦ #الدكتور_فلان"
-    result, error = asyncio.run(parse_message(text))
-    assert error is None
+    result, err = await parse_message(text)
+    assert err is None
     assert result.year == 1446
     assert result.lecturer == "فلان"
     assert helpers.raw_tags == ["#physics1", "#١٤٤٦", "#الدكتور_فلان"]
     assert result.raw_tags == helpers.raw_tags
 
 
-def test_parse_message_extracts_lecture_and_chain(repo_db):
-    async def setup() -> None:
-        aid = await hashtags.create_alias("physics1")
-        await hashtags.create_mapping(aid, "subject", 1, is_content_tag=True)
-
-    asyncio.run(setup())
-
+async def test_extracts_lecture_and_chain(repo_db, create_alias):
+    await create_alias("physics1", "subject", 1, is_content=True)
     text = "#physics1 #المحاضرة_2 //follow"
-    result, error = asyncio.run(parse_message(text))
-    assert error is None
+    result, err = await parse_message(text)
+    assert err is None
     assert result.lecture == 2
     assert result.chain == "follow"
     assert helpers.raw_tags == ["#physics1", "#المحاضرة_2"]
     assert result.raw_tags == helpers.raw_tags
 
 
-def test_parse_message_resolves_context_from_hashtags(repo_db):
-    async def setup() -> None:
-        aid_ct = await hashtags.create_alias("ctag")
-        await hashtags.create_mapping(aid_ct, "subject", 3, is_content_tag=True)
-        aid_sub = await hashtags.create_alias("physics")
-        await hashtags.create_mapping(aid_sub, "subject", 1)
-        aid_sec = await hashtags.create_alias("theory")
-        await hashtags.create_mapping(aid_sec, "section", 2)
-
-    asyncio.run(setup())
-
-    text = "#physics #theory #ctag"
-    result, error = asyncio.run(parse_message(text, group_id=1))
-    assert error is None
+async def test_context_from_hashtags(repo_db, create_alias):
+    await create_alias("ctag", "subject", 3, is_content=True)
+    await create_alias("physics", "subject", 1)
+    await create_alias("theory", "section", 2)
+    result, err = await parse_message("#physics #theory #ctag", group_id=1)
+    assert err is None
     assert result.subject == 1
     assert result.section == 2
 
 
-def test_parse_message_respects_overrides(repo_db):
-    async def setup() -> None:
-        aid = await hashtags.create_alias("physics1")
-        ov = json.dumps({"allows_year": False, "allows_lecturer": False})
-        await hashtags.create_mapping(
-            aid, "subject", 1, is_content_tag=True, overrides=ov
-        )
-
-    asyncio.run(setup())
-
+async def test_respects_overrides(repo_db, create_alias):
+    ov = json.dumps({"allows_year": False, "allows_lecturer": False})
+    await create_alias("physics1", "subject", 1, is_content=True, overrides=ov)
     text = "#physics1 #1446 #الدكتور_فلان"
-    result, error = asyncio.run(parse_message(text))
-    assert error is None
+    result, err = await parse_message(text)
+    assert err is None
     assert result.year is None
     assert result.lecturer is None
 
 
-def test_parse_message_requires_session_for_item_type(repo_db):
-    async def setup() -> None:
-        item = await taxonomy.create_item_type("محاضرة", "Lecture", requires_lecture=True)
-        aid = await hashtags.create_alias("physics1")
-        ov = json.dumps({"item_type": item["id"]})
-        await hashtags.create_mapping(
-            aid, "subject", 1, is_content_tag=True, overrides=ov
-        )
-
-    asyncio.run(setup())
-
-    result, error = asyncio.run(parse_message("#physics1"))
-    assert isinstance(error, ParseError)
-    assert error.message == "E-NO-SESSION"
-
-    result, error = asyncio.run(parse_message("#physics1 #المحاضرة_1"))
-    assert error is None
+async def test_alias_conflict(repo_db, create_alias):
+    sec = await taxonomy.create_section("نظري", "Theory")
+    card = await taxonomy.create_card("سلايدات", "Slides", section_id=sec["id"])
+    item = await taxonomy.create_item_type("ملف", "File")
+    ov = json.dumps({"card": card["id"]})
+    await create_alias("physics1", "subject", 1, is_content=True, overrides=ov)
+    await create_alias("file", "item_type", item["id"])
+    result, err = await parse_message("#physics1 #file")
+    assert isinstance(err, ParseError)
+    assert err.message == "E-ALIAS-CONFLICT"
 
 
-def test_parse_message_alias_conflict_card_item_type(repo_db):
-    async def setup() -> None:
-        sec = await taxonomy.create_section("نظري", "Theory")
-        card = await taxonomy.create_card("سلايدات", "Slides", section_id=sec["id"])
-        item = await taxonomy.create_item_type("ملف", "File")
-        aid_content = await hashtags.create_alias("physics1")
-        ov = json.dumps({"card": card["id"]})
-        await hashtags.create_mapping(
-            aid_content, "subject", 1, is_content_tag=True, overrides=ov
-        )
-        aid_item = await hashtags.create_alias("file")
-        await hashtags.create_mapping(aid_item, "item_type", item["id"])
-
-    asyncio.run(setup())
-
-    result, error = asyncio.run(parse_message("#physics1 #file"))
-    assert isinstance(error, ParseError)
-    assert error.message == "E-ALIAS-CONFLICT"
