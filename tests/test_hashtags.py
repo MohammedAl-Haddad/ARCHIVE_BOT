@@ -77,3 +77,10 @@ def test_parse_hashtags_content_type(tag, expected):
     info, error = parse_hashtags(tag)
     assert error is None
     assert info.content_type == expected
+
+
+def test_parse_hashtags_chain_intent():
+    info, error = parse_hashtags("#study_plan //follow")
+    assert error is None
+    assert info.content_type == "study_plan"
+    assert info.chain.intent == "follow"
