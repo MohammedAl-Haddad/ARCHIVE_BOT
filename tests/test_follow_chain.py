@@ -3,6 +3,7 @@ import pytest
 from types import SimpleNamespace
 import itertools
 import time
+import re
 
 os.environ.setdefault("BOT_TOKEN", "x")
 os.environ.setdefault("ARCHIVE_CHANNEL_ID", "1")
@@ -31,6 +32,11 @@ def setup_environment(monkeypatch):
         return iid
 
     async def fake_parse_hashtags(text):
+        m = re.search(r"(//follow|//end|//cancel)$", text)
+        intent = "none"
+        if m:
+            intent = m.group(1)[2:]
+            text = text[: m.start()].strip()
         tag = text.lstrip("#")
         return (
             SimpleNamespace(
@@ -40,6 +46,7 @@ def setup_environment(monkeypatch):
                 lecturer=None,
                 tags=[],
                 lecture_no=None,
+                chain=SimpleNamespace(intent=intent),
             ),
             None,
         )
@@ -110,11 +117,9 @@ async def test_follow_chain_sequence(monkeypatch):
     context, calls = setup_environment(monkeypatch)
     msg_id = itertools.count(1)
 
-    await ingestion.ingestion_handler(make_update("#slides", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("//follow", next(msg_id)), context)
+    await ingestion.ingestion_handler(make_update("#slides //follow", next(msg_id)), context)
     await ingestion.ingestion_handler(make_update("#board_images", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("#audio", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("//end", next(msg_id)), context)
+    await ingestion.ingestion_handler(make_update("#audio //end", next(msg_id)), context)
     await ingestion.ingestion_handler(make_update("#video", next(msg_id)), context)
 
     assert calls == [
@@ -129,10 +134,8 @@ async def test_cancel_follow_chain(monkeypatch):
     context, calls = setup_environment(monkeypatch)
     msg_id = itertools.count(1)
 
-    await ingestion.ingestion_handler(make_update("#slides", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("//follow", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("#board_images", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("//cancel", next(msg_id)), context)
+    await ingestion.ingestion_handler(make_update("#slides //follow", next(msg_id)), context)
+    await ingestion.ingestion_handler(make_update("#board_images //cancel", next(msg_id)), context)
     await ingestion.ingestion_handler(make_update("#video", next(msg_id)), context)
 
     assert calls == [
@@ -146,8 +149,7 @@ async def test_chain_timeout(monkeypatch):
     context, calls = setup_environment(monkeypatch)
     msg_id = itertools.count(1)
 
-    await ingestion.ingestion_handler(make_update("#slides", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("//follow", next(msg_id)), context)
+    await ingestion.ingestion_handler(make_update("#slides //follow", next(msg_id)), context)
     # expire chain
     key = (111, 42)
     context.chat_data["follow_chains"][key]["expires_at"] = time.time() - 1

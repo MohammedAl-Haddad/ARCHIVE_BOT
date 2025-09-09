@@ -67,11 +67,10 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     key = (chat.id, user.id) if chat and user else None
     if not hasattr(context, "chat_data"):
         context.chat_data = {}
-
-    if text.startswith("//"):
-        command = text.strip().lower()
-        chains = context.chat_data.setdefault("follow_chains", {})
-        if command == "//follow" and key:
+    chains = context.chat_data.setdefault("follow_chains", {})
+    intent = getattr(getattr(info, "chain", None), "intent", "none")
+    if intent != "none" and key and not info.tags and not info.content_type:
+        if intent == "follow":
             last_map = context.chat_data.setdefault("last_ingestion", {})
             last_id = last_map.get(key)
             if last_id is not None:
@@ -80,7 +79,7 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                     "parent_id": last_id,
                     "expires_at": time.time() + 60,
                 }
-        elif command in {"//end", "//cancel"} and key:
+        else:
             chains.pop(key, None)
         return
 
@@ -373,6 +372,14 @@ async def ingestion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         if chain_id:
             chains[key]["parent_id"] = ingestion_id
             chains[key]["expires_at"] = time.time() + 60
+        if intent == "follow":
+            chains[key] = {
+                "chain_id": ingestion_id,
+                "parent_id": ingestion_id,
+                "expires_at": time.time() + 60,
+            }
+        elif intent in {"end", "cancel"}:
+            chains.pop(key, None)
     await send_ephemeral(
         context,
         chat.id,

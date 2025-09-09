@@ -17,7 +17,7 @@ rules described in :mod:`README`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 from typing import Iterable, List, Tuple
 
@@ -29,6 +29,7 @@ from . import helpers
 # ---------------------------------------------------------------------------
 BIDI_RE = re.compile(r"[\u200e\u200f\u202a-\u202e]")
 _ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+CHAIN_RE = re.compile(r"\s*(//follow|//end|//cancel)\s*$", re.IGNORECASE)
 
 
 def _clean(text: str) -> str:
@@ -236,6 +237,11 @@ def classify_hashtag(tag: str) -> Tuple[str | None, str | None]:
 
 
 @dataclass
+class ChainInfo:
+    intent: str = "none"
+
+
+@dataclass
 class ParsedHashtags:
     content_type: str | None = None
     lecture_no: int | None = None
@@ -245,6 +251,7 @@ class ParsedHashtags:
     lecturer: str | None = None
     section: str | None = None
     tags: List[str] | None = None
+    chain: ChainInfo = field(default_factory=ChainInfo)
 
 
 # Regular expressions
@@ -274,10 +281,17 @@ def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
     contains a short Arabic message suitable for presenting to the user.
     """
 
+    intent = "none"
+    if text:
+        m_chain = CHAIN_RE.search(text)
+        if m_chain:
+            intent = m_chain.group(1)[2:].lower()
+            text = text[: m_chain.start()].rstrip()
     cleaned = _clean(text or "")
     tags = _split_lines(cleaned)
     helpers.raw_tags = tags.copy()
     info = ParsedHashtags(tags=tags)
+    info.chain.intent = intent
     sequence: List[str] = []
 
     for raw in tags:

@@ -3,6 +3,7 @@ import asyncio
 import itertools
 from importlib import import_module
 from types import SimpleNamespace
+import re
 
 import pytest
 
@@ -35,7 +36,12 @@ def setup_environment(monkeypatch):
         return iid
 
     async def fake_parse_hashtags(text):
-        tag = text.split()[0].lstrip("#")
+        m = re.search(r"(//follow|//end|//cancel)$", text)
+        intent = "none"
+        if m:
+            intent = m.group(1)[2:]
+            text = text[: m.start()].strip()
+        tag = text.split()[0].lstrip("#") if text.strip() else ""
         return (
             SimpleNamespace(
                 year=None,
@@ -44,6 +50,7 @@ def setup_environment(monkeypatch):
                 tags=[],
                 lecture_no=None,
                 lecturer=None,
+                chain=SimpleNamespace(intent=intent),
             ),
             None,
         )
@@ -130,11 +137,9 @@ async def test_follow_chain(monkeypatch):
     context, calls, sent = setup_environment(monkeypatch)
     msg_id = itertools.count(1)
 
-    await ingestion.ingestion_handler(make_update("#slides", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("//follow", next(msg_id)), context)
+    await ingestion.ingestion_handler(make_update("#slides //follow", next(msg_id)), context)
     await ingestion.ingestion_handler(make_update("#board_images", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("#audio", next(msg_id)), context)
-    await ingestion.ingestion_handler(make_update("//end", next(msg_id)), context)
+    await ingestion.ingestion_handler(make_update("#audio //end", next(msg_id)), context)
     await ingestion.ingestion_handler(make_update("#video", next(msg_id)), context)
 
     assert calls == [
