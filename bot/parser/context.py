@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from ..repo import RepoNotFound, hashtags, linking
-from .caption_parser import ParseError
+from .errors import ParseError
 
 
 @dataclass
