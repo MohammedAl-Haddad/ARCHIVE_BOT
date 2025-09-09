@@ -28,6 +28,7 @@ class ParseResult:
     tg_topic_id: Optional[int] = None
     locale: Optional[str] = None
     hashtags: Optional[List[dict]] = None
+    content_tag: Optional[dict] = None
 
 
 @dataclass
@@ -69,9 +70,31 @@ async def parse_message(
                 tg_topic_id=tg_topic_id,
                 locale=user_locale,
                 hashtags=None,
+                content_tag=None,
             )
             return result, ParseError("E-HT-UNKNOWN")
         tags.append(resolved)
+    content_tags = [t for t in tags if t.get("is_content_tag")]
+    if not content_tags:
+        result = ParseResult(
+            text=message_text,
+            group_id=group_id,
+            tg_topic_id=tg_topic_id,
+            locale=user_locale,
+            hashtags=tags or None,
+            content_tag=None,
+        )
+        return result, ParseError("E-NO-CONTENT-TAG")
+    if len(content_tags) > 1:
+        result = ParseResult(
+            text=message_text,
+            group_id=group_id,
+            tg_topic_id=tg_topic_id,
+            locale=user_locale,
+            hashtags=tags or None,
+            content_tag=None,
+        )
+        return result, ParseError("E-HT-MULTI")
 
     result = ParseResult(
         text=message_text,
@@ -79,6 +102,7 @@ async def parse_message(
         tg_topic_id=tg_topic_id,
         locale=user_locale,
         hashtags=tags or None,
+        content_tag=content_tags[0],
     )
     return result, None
 
