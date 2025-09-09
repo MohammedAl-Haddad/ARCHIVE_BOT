@@ -159,9 +159,9 @@ async def test_sensitivity_block(monkeypatch):
 
 
 def test_rbac_integration(repo_db):
-    role_id = asyncio.run(rbac.create_role("mod", ["mods"]))
-    asyncio.run(rbac.assign_role(1, role_id))
-    asyncio.run(rbac.set_permission(role_id, "delete"))
+    role = asyncio.run(rbac.create_role("mod", ["mods"]))
+    asyncio.run(rbac.assign_role(1, role["id"]))
+    asyncio.run(rbac.set_permission(role["id"], "delete"))
     assert asyncio.run(rbac.has_permission(1, "delete"))
 
 
