@@ -1,6 +1,8 @@
 import asyncio
+import json
 
 from bot.parser.caption_parser import ParseError, parse_message
+from bot.parser import helpers
 from bot.repo import hashtags
 
 
@@ -68,3 +70,35 @@ def test_parse_message_multiple_content_tags_error(repo_db):
     assert error.message == "E-HT-MULTI"
     assert result.content_tag is None
     assert len(result.hashtags) == 2
+
+
+def test_parse_message_extracts_year_and_lecturer_and_logs_raw_tags(repo_db):
+    async def setup() -> None:
+        aid = await hashtags.create_alias("physics1")
+        await hashtags.create_mapping(aid, "subject", 1, is_content_tag=True)
+
+    asyncio.run(setup())
+
+    text = "#physics1 #١٤٤٦ #الدكتور_فلان"
+    result, error = asyncio.run(parse_message(text))
+    assert error is None
+    assert result.year == 1446
+    assert result.lecturer == "فلان"
+    assert helpers.raw_tags == ["#physics1", "#١٤٤٦", "#الدكتور_فلان"]
+
+
+def test_parse_message_respects_overrides(repo_db):
+    async def setup() -> None:
+        aid = await hashtags.create_alias("physics1")
+        ov = json.dumps({"allows_year": False, "allows_lecturer": False})
+        await hashtags.create_mapping(
+            aid, "subject", 1, is_content_tag=True, overrides=ov
+        )
+
+    asyncio.run(setup())
+
+    text = "#physics1 #1446 #الدكتور_فلان"
+    result, error = asyncio.run(parse_message(text))
+    assert error is None
+    assert result.year is None
+    assert result.lecturer is None
