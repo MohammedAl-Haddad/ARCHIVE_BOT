@@ -22,6 +22,7 @@ import re
 from typing import Iterable, List, Tuple
 
 from ..utils.formatting import arabic_ordinal, to_display_name, ARABIC_ORDINALS
+from . import helpers
 
 # ---------------------------------------------------------------------------
 # Normalisation helpers
@@ -275,6 +276,7 @@ def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
 
     cleaned = _clean(text or "")
     tags = _split_lines(cleaned)
+    helpers.raw_tags = tags.copy()
     info = ParsedHashtags(tags=tags)
     sequence: List[str] = []
 
@@ -298,7 +300,7 @@ def parse_hashtags(text: str) -> Tuple[ParsedHashtags, str | None]:
         m = YEAR_TAG_RE.match(token)
         if m and info.year is None:
             y = int(m.group(1))
-            if 1300 <= y <= 1600:
+            if 1300 <= y <= 1600 or 1900 <= y <= 2100:
                 info.year = y
                 sequence.append("year")
                 continue
