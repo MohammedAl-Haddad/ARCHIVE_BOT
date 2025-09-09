@@ -14,9 +14,9 @@ import json
 import re
 from typing import List, Optional, Tuple
 
-from ..repo import RepoNotFound, hashtags
+from ..repo import RepoNotFound, hashtags, taxonomy
 from ..utils.formatting import to_display_name
-from .hashtags import YEAR_TAG_RE, LECTURER_PREFIXES
+from .hashtags import YEAR_TAG_RE, LECTURE_TAG_RE, LECTURER_PREFIXES
 from . import helpers
 
 BIDI_RE = re.compile(r"[\u200e\u200f\u202a-\u202e]")
@@ -67,6 +67,9 @@ async def parse_message(
     content_tags: List[dict] = []
     year: Optional[int] = None
     lecturer: Optional[str] = None
+    lecture_no: Optional[int] = None
+    card_ids: set[int] = set()
+    item_type_ids: set[int] = set()
     for m in matches:
         tag = m.group(1)
         normalized = hashtags.normalize_alias(tag)
@@ -89,6 +92,14 @@ async def parse_message(
             if lecturer is not None:
                 continue
 
+        if lecture_no is None:
+            m_lecture = LECTURE_TAG_RE.match(f"#{normalized}")
+            if m_lecture:
+                ident = m_lecture.group(1)
+                if ident.isdigit():
+                    lecture_no = int(ident)
+                continue
+
         try:
             resolved = await hashtags.resolve_content_tag(normalized)
         except RepoNotFound:
@@ -106,6 +117,10 @@ async def parse_message(
         tags.append(resolved)
         if resolved.get("is_content_tag"):
             content_tags.append(resolved)
+        if resolved.get("target_kind") == "card":
+            card_ids.add(resolved["target_id"])
+        elif resolved.get("target_kind") == "item_type":
+            item_type_ids.add(resolved["target_id"])
     if not content_tags:
         result = ParseResult(
             text=message_text,
@@ -143,6 +158,56 @@ async def parse_message(
         year = None
     if not overrides_data.get("allows_lecturer", True):
         lecturer = None
+
+    card_override = overrides_data.get("card")
+    item_type_override = overrides_data.get("item_type")
+    requires_lecture = bool(overrides_data.get("requires_lecture"))
+
+    conflict = False
+    if len(card_ids) > 1 or len(item_type_ids) > 1:
+        conflict = True
+    card_tag = next(iter(card_ids), None)
+    item_type_tag = next(iter(item_type_ids), None)
+    if not conflict:
+        if card_override is not None and card_tag is not None and card_override != card_tag:
+            conflict = True
+        elif item_type_override is not None and item_type_tag is not None and item_type_override != item_type_tag:
+            conflict = True
+        elif ((card_override is not None or card_tag is not None)
+              and (item_type_override is not None or item_type_tag is not None)):
+            conflict = True
+
+    if conflict:
+        result = ParseResult(
+            text=message_text,
+            group_id=group_id,
+            tg_topic_id=tg_topic_id,
+            locale=user_locale,
+            hashtags=tags or None,
+            content_tag=content_tag,
+            year=year,
+            lecturer=lecturer,
+        )
+        return result, ParseError("E-ALIAS-CONFLICT")
+
+    item_type_id = item_type_override or item_type_tag
+    if item_type_id is not None:
+        item = await taxonomy.get_item_type(item_type_id, include_disabled=True)
+        if item and item.get("requires_lecture"):
+            requires_lecture = True
+
+    if requires_lecture and lecture_no is None:
+        result = ParseResult(
+            text=message_text,
+            group_id=group_id,
+            tg_topic_id=tg_topic_id,
+            locale=user_locale,
+            hashtags=tags or None,
+            content_tag=content_tag,
+            year=year,
+            lecturer=lecturer,
+        )
+        return result, ParseError("E-NO-SESSION")
 
     result = ParseResult(
         text=message_text,
