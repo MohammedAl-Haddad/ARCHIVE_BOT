@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import re
 from typing import List, Optional, Tuple
 
-from ..repo.hashtags import normalize_alias
+from ..repo import RepoNotFound, hashtags
 
 BIDI_RE = re.compile(r"[\u200e\u200f\u202a-\u202e]")
 HASHTAG_RE = re.compile(r"#([^\s#]+)")
@@ -27,7 +27,7 @@ class ParseResult:
     group_id: Optional[int] = None
     tg_topic_id: Optional[int] = None
     locale: Optional[str] = None
-    hashtags: Optional[List[str]] = None
+    hashtags: Optional[List[dict]] = None
 
 
 @dataclass
@@ -47,18 +47,31 @@ async def parse_message(
     """Parse *message_text* and return ``(result, error)``.
 
     Extract hashtags using :data:`HASHTAG_RE`, normalise Arabic digits and
-    case using :func:`normalize_alias`, and remove direction markers so the
+    case using :func:`hashtags.normalize_alias`, resolve their targets using
+    :func:`hashtags.resolve_content_tag`, and remove direction markers so the
     comparison is case and direction insensitive.
     """
 
     clean_text = BIDI_RE.sub("", message_text)
     seen: set[str] = set()
-    tags: List[str] = []
+    tags: List[dict] = []
     for tag in HASHTAG_RE.findall(clean_text):
-        normalized = normalize_alias(tag)
-        if normalized not in seen:
-            seen.add(normalized)
-            tags.append(normalized)
+        normalized = hashtags.normalize_alias(tag)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        try:
+            resolved = await hashtags.resolve_content_tag(normalized)
+        except RepoNotFound:
+            result = ParseResult(
+                text=message_text,
+                group_id=group_id,
+                tg_topic_id=tg_topic_id,
+                locale=user_locale,
+                hashtags=None,
+            )
+            return result, ParseError("E-HT-UNKNOWN")
+        tags.append(resolved)
 
     result = ParseResult(
         text=message_text,
