@@ -4,6 +4,7 @@ import json
 from bot.parser.caption_parser import ParseError, parse_message
 from bot.parser import helpers
 from bot.repo import hashtags
+from bot.repo import taxonomy
 
 
 def test_parse_message_resolves_normalized_hashtags(repo_db):
@@ -102,3 +103,42 @@ def test_parse_message_respects_overrides(repo_db):
     assert error is None
     assert result.year is None
     assert result.lecturer is None
+
+
+def test_parse_message_requires_session_for_item_type(repo_db):
+    async def setup() -> None:
+        item = await taxonomy.create_item_type("محاضرة", "Lecture", requires_lecture=True)
+        aid = await hashtags.create_alias("physics1")
+        ov = json.dumps({"item_type": item["id"]})
+        await hashtags.create_mapping(
+            aid, "subject", 1, is_content_tag=True, overrides=ov
+        )
+
+    asyncio.run(setup())
+
+    result, error = asyncio.run(parse_message("#physics1"))
+    assert isinstance(error, ParseError)
+    assert error.message == "E-NO-SESSION"
+
+    result, error = asyncio.run(parse_message("#physics1 #المحاضرة_1"))
+    assert error is None
+
+
+def test_parse_message_alias_conflict_card_item_type(repo_db):
+    async def setup() -> None:
+        sec = await taxonomy.create_section("نظري", "Theory")
+        card = await taxonomy.create_card("سلايدات", "Slides", section_id=sec["id"])
+        item = await taxonomy.create_item_type("ملف", "File")
+        aid_content = await hashtags.create_alias("physics1")
+        ov = json.dumps({"card": card["id"]})
+        await hashtags.create_mapping(
+            aid_content, "subject", 1, is_content_tag=True, overrides=ov
+        )
+        aid_item = await hashtags.create_alias("file")
+        await hashtags.create_mapping(aid_item, "item_type", item["id"])
+
+    asyncio.run(setup())
+
+    result, error = asyncio.run(parse_message("#physics1 #file"))
+    assert isinstance(error, ParseError)
+    assert error.message == "E-ALIAS-CONFLICT"
