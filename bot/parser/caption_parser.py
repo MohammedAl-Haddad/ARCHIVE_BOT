@@ -16,7 +16,14 @@ from typing import List, Optional, Tuple
 
 from ..repo import RepoNotFound, hashtags, taxonomy
 from ..utils.formatting import to_display_name
-from .hashtags import YEAR_TAG_RE, LECTURE_TAG_RE, LECTURER_PREFIXES
+from .hashtags import (
+    YEAR_TAG_RE,
+    LECTURE_TAG_RE,
+    LECTURER_PREFIXES,
+    CHAIN_RE,
+)
+from .context import parse_context
+from .errors import ParseError
 from . import helpers
 
 BIDI_RE = re.compile(r"[\u200e\u200f\u202a-\u202e]")
@@ -35,14 +42,11 @@ class ParseResult:
     content_tag: Optional[dict] = None
     year: Optional[int] = None
     lecturer: Optional[str] = None
-
-
-@dataclass
-class ParseError:
-    """Information about a parsing error."""
-
-    message: str
-    details: Optional[str] = None
+    lecture: Optional[int] = None
+    subject: Optional[int] = None
+    section: Optional[int] = None
+    chain: Optional[str] = None
+    raw_tags: Optional[List[str]] = None
 
 
 async def parse_message(
@@ -59,9 +63,25 @@ async def parse_message(
     comparison is case and direction insensitive.
     """
 
-    clean_text = BIDI_RE.sub("", message_text)
+    chain_intent: Optional[str] = None
+    m_chain = CHAIN_RE.search(message_text)
+    text_no_chain = message_text
+    if m_chain:
+        chain_intent = m_chain.group(1)[2:].lower()
+        text_no_chain = message_text[: m_chain.start()].rstrip()
+
+    clean_text = BIDI_RE.sub("", text_no_chain)
     matches = list(HASHTAG_RE.finditer(clean_text))
     helpers.raw_tags = [m.group(0) for m in matches]
+
+    subject: Optional[int] = None
+    section: Optional[int] = None
+    if group_id is not None:
+        ctx, ctx_err = await parse_context(group_id, tg_topic_id, helpers.raw_tags)
+        if ctx_err is None:
+            subject = ctx.subject_id
+            section = ctx.section_id
+
     seen: set[str] = set()
     tags: List[dict] = []
     content_tags: List[dict] = []
@@ -104,7 +124,7 @@ async def parse_message(
             resolved = await hashtags.resolve_content_tag(normalized)
         except RepoNotFound:
             result = ParseResult(
-                text=message_text,
+                text=text_no_chain,
                 group_id=group_id,
                 tg_topic_id=tg_topic_id,
                 locale=user_locale,
@@ -112,6 +132,11 @@ async def parse_message(
                 content_tag=None,
                 year=year,
                 lecturer=lecturer,
+                lecture=lecture_no,
+                subject=subject,
+                section=section,
+                chain=chain_intent,
+                raw_tags=helpers.raw_tags,
             )
             return result, ParseError("E-HT-UNKNOWN")
         tags.append(resolved)
@@ -123,7 +148,7 @@ async def parse_message(
             item_type_ids.add(resolved["target_id"])
     if not content_tags:
         result = ParseResult(
-            text=message_text,
+            text=text_no_chain,
             group_id=group_id,
             tg_topic_id=tg_topic_id,
             locale=user_locale,
@@ -131,11 +156,16 @@ async def parse_message(
             content_tag=None,
             year=year,
             lecturer=lecturer,
+            lecture=lecture_no,
+            subject=subject,
+            section=section,
+            chain=chain_intent,
+            raw_tags=helpers.raw_tags,
         )
         return result, ParseError("E-NO-CONTENT-TAG")
     if len(content_tags) > 1:
         result = ParseResult(
-            text=message_text,
+            text=text_no_chain,
             group_id=group_id,
             tg_topic_id=tg_topic_id,
             locale=user_locale,
@@ -143,6 +173,11 @@ async def parse_message(
             content_tag=None,
             year=year,
             lecturer=lecturer,
+            lecture=lecture_no,
+            subject=subject,
+            section=section,
+            chain=chain_intent,
+            raw_tags=helpers.raw_tags,
         )
         return result, ParseError("E-HT-MULTI")
 
@@ -179,7 +214,7 @@ async def parse_message(
 
     if conflict:
         result = ParseResult(
-            text=message_text,
+            text=text_no_chain,
             group_id=group_id,
             tg_topic_id=tg_topic_id,
             locale=user_locale,
@@ -187,6 +222,11 @@ async def parse_message(
             content_tag=content_tag,
             year=year,
             lecturer=lecturer,
+            lecture=lecture_no,
+            subject=subject,
+            section=section,
+            chain=chain_intent,
+            raw_tags=helpers.raw_tags,
         )
         return result, ParseError("E-ALIAS-CONFLICT")
 
@@ -198,7 +238,7 @@ async def parse_message(
 
     if requires_lecture and lecture_no is None:
         result = ParseResult(
-            text=message_text,
+            text=text_no_chain,
             group_id=group_id,
             tg_topic_id=tg_topic_id,
             locale=user_locale,
@@ -206,11 +246,16 @@ async def parse_message(
             content_tag=content_tag,
             year=year,
             lecturer=lecturer,
+            lecture=lecture_no,
+            subject=subject,
+            section=section,
+            chain=chain_intent,
+            raw_tags=helpers.raw_tags,
         )
         return result, ParseError("E-NO-SESSION")
 
     result = ParseResult(
-        text=message_text,
+        text=text_no_chain,
         group_id=group_id,
         tg_topic_id=tg_topic_id,
         locale=user_locale,
@@ -218,6 +263,11 @@ async def parse_message(
         content_tag=content_tag,
         year=year,
         lecturer=lecturer,
+        lecture=lecture_no,
+        subject=subject,
+        section=section,
+        chain=chain_intent,
+        raw_tags=helpers.raw_tags,
     )
     return result, None
 

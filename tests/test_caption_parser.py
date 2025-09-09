@@ -86,6 +86,41 @@ def test_parse_message_extracts_year_and_lecturer_and_logs_raw_tags(repo_db):
     assert result.year == 1446
     assert result.lecturer == "فلان"
     assert helpers.raw_tags == ["#physics1", "#١٤٤٦", "#الدكتور_فلان"]
+    assert result.raw_tags == helpers.raw_tags
+
+
+def test_parse_message_extracts_lecture_and_chain(repo_db):
+    async def setup() -> None:
+        aid = await hashtags.create_alias("physics1")
+        await hashtags.create_mapping(aid, "subject", 1, is_content_tag=True)
+
+    asyncio.run(setup())
+
+    text = "#physics1 #المحاضرة_2 //follow"
+    result, error = asyncio.run(parse_message(text))
+    assert error is None
+    assert result.lecture == 2
+    assert result.chain == "follow"
+    assert helpers.raw_tags == ["#physics1", "#المحاضرة_2"]
+    assert result.raw_tags == helpers.raw_tags
+
+
+def test_parse_message_resolves_context_from_hashtags(repo_db):
+    async def setup() -> None:
+        aid_ct = await hashtags.create_alias("ctag")
+        await hashtags.create_mapping(aid_ct, "subject", 3, is_content_tag=True)
+        aid_sub = await hashtags.create_alias("physics")
+        await hashtags.create_mapping(aid_sub, "subject", 1)
+        aid_sec = await hashtags.create_alias("theory")
+        await hashtags.create_mapping(aid_sec, "section", 2)
+
+    asyncio.run(setup())
+
+    text = "#physics #theory #ctag"
+    result, error = asyncio.run(parse_message(text, group_id=1))
+    assert error is None
+    assert result.subject == 1
+    assert result.section == 2
 
 
 def test_parse_message_respects_overrides(repo_db):

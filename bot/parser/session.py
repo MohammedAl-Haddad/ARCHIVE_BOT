@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import re
 from typing import Optional, Tuple
 
-from .caption_parser import ParseError
+from .errors import ParseError
 from ..repo import taxonomy
 from ..utils.formatting import ARABIC_ORDINALS
 
