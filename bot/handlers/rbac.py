@@ -17,8 +17,8 @@ async def create_role_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
     name = context.args[0]
     tags = context.args[1].split(",") if len(context.args) > 1 else []
-    role_id = await rbac.create_role(name, tags)
-    await update.effective_message.reply_text(f"Created role {role_id}")
+    role = await rbac.create_role(name, tags)
+    await update.effective_message.reply_text(f"Created role {role['id']}")
 
 
 async def assign_role_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

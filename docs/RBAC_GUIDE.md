@@ -14,11 +14,11 @@ import asyncio
 from bot.repo import rbac
 
 # create a role and give it a permission
-role_id = asyncio.run(rbac.create_role("mod"))
-asyncio.run(rbac.set_permission(role_id, "upload"))
+role = asyncio.run(rbac.create_role("mod"))
+asyncio.run(rbac.set_permission(role["id"], "upload"))
 
 # assign the role to a user
-asyncio.run(rbac.assign_role(1234, role_id))
+asyncio.run(rbac.assign_role(1234, role["id"]))
 
 # check a permission
 assert asyncio.run(rbac.has_permission(1234, "upload"))
