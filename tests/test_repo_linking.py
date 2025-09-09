@@ -1,6 +1,8 @@
 import asyncio
 
-from bot.repo import linking
+import pytest
+
+from bot.repo import linking, RepoNotFound
 
 
 def test_group_crud(repo_db):
@@ -14,9 +16,21 @@ def test_group_crud(repo_db):
 
 def test_topic_crud(repo_db):
     gid = asyncio.run(linking.upsert_group(456, "G"))
-    tid = asyncio.run(linking.upsert_topic(gid, 789, 3, section_id=2))
-    row = asyncio.run(linking.get_topic(gid, 789))
-    assert row[0] == tid
-    asyncio.run(linking.upsert_topic(gid, 789, 4, section_id=1))
-    row = asyncio.run(linking.get_topic(gid, 789))
-    assert row[3] == 4 and row[4] == 1
+    asyncio.run(linking.upsert_topic(gid, 1, 3, section_id=2))
+    asyncio.run(linking.upsert_topic(gid, 2, 4, section_id=1))
+
+    binding = asyncio.run(linking.get_binding_by_topic(gid, 2))
+    assert binding == {"subject_id": 4, "section_id": 1}
+
+    rows = asyncio.run(linking.get_group_topics(gid))
+    assert {r[2] for r in rows} == {1, 2}
+
+    asyncio.run(linking.upsert_topic(gid, 2, 5, section_id=None))
+    binding = asyncio.run(linking.get_binding_by_topic(gid, 2))
+    assert binding == {"subject_id": 5, "section_id": None}
+
+    asyncio.run(linking.delete_topic(gid, 1))
+    rows = asyncio.run(linking.get_group_topics(gid))
+    assert [r[2] for r in rows] == [2]
+    with pytest.raises(RepoNotFound):
+        asyncio.run(linking.get_binding_by_topic(gid, 1))

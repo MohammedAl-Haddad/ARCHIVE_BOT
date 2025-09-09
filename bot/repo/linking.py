@@ -144,3 +144,64 @@ async def get_topic(group_id: int, tg_topic_id: int) -> tuple | None:
             (group_id, tg_topic_id),
         )
         return await cur.fetchone()
+
+
+@translate_errors
+async def get_binding_by_topic(group_id: int, tg_topic_id: int) -> dict:
+    """Return subject/section binding for a Telegram topic.
+
+    Args:
+        group_id: معرف المجموعة / group id.
+        tg_topic_id: معرف موضوع تيليغرام / Telegram topic id.
+
+    Returns:
+        dict: ``{"subject_id": int, "section_id": int | None}``.
+
+    Raises:
+        RepoNotFound: إذا لم يوجد الربط / if mapping missing.
+        RepoError: أخطاء قاعدة البيانات / DB errors.
+    """
+
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT subject_id, section_id FROM topics WHERE group_id=? AND tg_topic_id=?",
+            (group_id, tg_topic_id),
+        )
+        row = await cur.fetchone()
+    if row is None:
+        raise RepoNotFound("topic not found")
+    return {"subject_id": row[0], "section_id": row[1]}
+
+
+@translate_errors
+async def get_group_topics(group_id: int) -> list[tuple]:
+    """Return all topic rows linked to a group.
+
+    Args:
+        group_id: معرف المجموعة / group id.
+
+    Returns:
+        list[tuple]: صفوف المواضيع / topic rows.
+
+    Raises:
+        RepoError: أخطاء قاعدة البيانات / DB errors.
+    """
+
+    async with connect() as db:
+        cur = await db.execute(
+            "SELECT id, group_id, tg_topic_id, subject_id, section_id FROM topics WHERE group_id=?",
+            (group_id,),
+        )
+        return await cur.fetchall()
+
+
+@translate_errors
+async def delete_topic(group_id: int, tg_topic_id: int) -> None:
+    """Delete topic mapping by group and Telegram topic ids."""
+
+    async with connect() as db:
+        await db.execute(
+            "DELETE FROM topics WHERE group_id=? AND tg_topic_id=?",
+            (group_id, tg_topic_id),
+        )
+        await db.commit()
