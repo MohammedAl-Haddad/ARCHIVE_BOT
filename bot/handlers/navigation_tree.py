@@ -8,6 +8,8 @@ Navigation flow: level → term → subject → section → filter (year/lecture
 from typing import Optional
 import time
 import logging
+import asyncio
+from types import SimpleNamespace
 
 from telegram import Update
 from telegram.error import BadRequest
@@ -30,9 +32,9 @@ from ..db import (
     MANAGE_ADMINS,
     get_latest_term_resource,
     get_types_for_lecture,
-    LECTURE_TYPE_LABELS,
     get_materials_by_card,
 )
+from ..repo import taxonomy
 from ..utils.retry import retry
 
 logger = logging.getLogger(__name__)
@@ -40,29 +42,144 @@ logger = logging.getLogger(__name__)
 LAST_CHILDREN_KEY = "last_children"
 LAST_CHILDREN_TTL_SECONDS = CACHE_TTL_SECONDS
 
-# Arabic labels with icons for subject sections
-SECTION_LABELS = {
-    "theory": "نظري 📘",
-    "discussion": "مناقشة 💬",
-    "lab": "عملي 🔬",
-    "field_trip": "رحلة 🚌",
-}
+LABEL_CACHE_KEY = "navtree_label_cache"
+LABEL_CACHE_TTL_SECONDS = 300
 
-# Arabic labels with icons for subject cards
-CARD_LABELS = {
-    "syllabus": "التوصيف 📄",
-    "glossary": "المفردات الدراسية 📖",
-    "practical": "الواقع التطبيقي ⚙️",
-    "references": "مراجع 📚",
-    "skills": "مهارات 🧠",
-    "open_source_projects": "مشاريع مفتوحة المصدر 🛠️",
-}
 
-# Labels for filter options used when a subject has a single section
-FILTER_LABELS = {
-    "year": "حسب السنة",
-    "lecturer": "حسب المحاضر",
-}
+def _label_with_emoji(key: str, row: dict, emoji_map: dict) -> str:
+    """Return label optionally suffixed with an emoji from DB or settings."""
+
+    label = row.get("label", key)
+    emoji = row.get("emoji") or emoji_map.get(key)
+    if emoji:
+        label = f"{label} {emoji}"
+    return label
+
+
+async def _get_label_maps(context: ContextTypes.DEFAULT_TYPE, lang: str):
+    """Fetch label mappings for sections, cards and item types."""
+
+    cache_container = getattr(context, "bot_data", {})
+    cache = cache_container.get(LABEL_CACHE_KEY, {}) if isinstance(cache_container, dict) else {}
+    now = time.time()
+    cached = cache.get(lang)
+    if cached and now - cached.get("timestamp", 0) < LABEL_CACHE_TTL_SECONDS:
+        return cached["sections"], cached["cards"], cached["item_types"]
+
+    try:
+        sections = await taxonomy.get_sections(lang=lang)
+        cards = await taxonomy.get_cards(lang=lang)
+        item_types = await taxonomy.get_item_types(lang=lang)
+    except Exception:
+        sections = cards = item_types = []
+
+    try:
+        sections_en = sections if lang == "en" else await taxonomy.get_sections(lang="en")
+        cards_en = cards if lang == "en" else await taxonomy.get_cards(lang="en")
+        item_types_en = item_types if lang == "en" else await taxonomy.get_item_types(lang="en")
+    except Exception:
+        sections_en, cards_en, item_types_en = sections, cards, item_types
+
+    emoji_map = cache_container.get("emoji_map") if isinstance(cache_container, dict) else None
+    if emoji_map is None:
+        emoji_map = {
+            "theory": "📘",
+            "discussion": "💬",
+            "lab": "🔬",
+            "field_trip": "🚌",
+            "syllabus": "📄",
+            "glossary": "📖",
+            "practical": "⚙️",
+            "references": "📚",
+            "skills": "🧠",
+            "open_source_projects": "🛠️",
+        }
+
+    section_labels = {}
+    for base, localized in zip(sections_en, sections):
+        key = base.get("key") or base.get("label")
+        section_labels[key] = _label_with_emoji(key, localized, emoji_map)
+
+    card_labels = {}
+    for base, localized in zip(cards_en, cards):
+        key = base.get("key") or base.get("label")
+        card_labels[key] = _label_with_emoji(key, localized, emoji_map)
+
+    item_type_labels = {}
+    for base, localized in zip(item_types_en, item_types):
+        key = base.get("key") or base.get("label")
+        item_type_labels[key] = _label_with_emoji(key, localized, emoji_map)
+
+    if not section_labels:
+        defaults = {
+            "theory": {"ar": "نظري", "en": "Theory"},
+            "discussion": {"ar": "مناقشة", "en": "Discussion"},
+            "lab": {"ar": "عملي", "en": "Lab"},
+            "field_trip": {"ar": "رحلة", "en": "Field Trip"},
+        }
+        for key, labels in defaults.items():
+            label = labels.get(lang, key)
+            emoji = emoji_map.get(key)
+            if emoji:
+                label = f"{label} {emoji}"
+            section_labels[key] = label
+
+    if not card_labels:
+        defaults = {
+            "syllabus": {"ar": "التوصيف", "en": "Syllabus"},
+            "glossary": {"ar": "المفردات الدراسية", "en": "Glossary"},
+            "practical": {"ar": "الواقع التطبيقي", "en": "Practical"},
+            "references": {"ar": "مراجع", "en": "References"},
+            "skills": {"ar": "مهارات", "en": "Skills"},
+            "open_source_projects": {
+                "ar": "مشاريع مفتوحة المصدر",
+                "en": "Open Source Projects",
+            },
+        }
+        for key, labels in defaults.items():
+            label = labels.get(lang, key)
+            emoji = emoji_map.get(key)
+            if emoji:
+                label = f"{label} {emoji}"
+            card_labels[key] = label
+
+    if not item_type_labels:
+        defaults = {
+            "lecture": {"ar": "ملف المحاضرة", "en": "Lecture"},
+            "slides": {"ar": "السلايدات", "en": "Slides"},
+            "audio": {"ar": "الصوت", "en": "Audio"},
+            "board_images": {"ar": "صور اللوح", "en": "Board Images"},
+            "video": {"ar": "الفيديو", "en": "Video"},
+            "mind_map": {"ar": "الخريطة الذهنية", "en": "Mind Map"},
+            "transcript": {"ar": "التفريغ", "en": "Transcript"},
+            "related": {"ar": "مواد مرتبطة", "en": "Related"},
+            "year": {"ar": "حسب السنة", "en": "By year"},
+            "lecturer": {"ar": "حسب المحاضر", "en": "By lecturer"},
+        }
+        for key, labels in defaults.items():
+            label = labels.get(lang, key)
+            emoji = emoji_map.get(key)
+            if emoji:
+                label = f"{label} {emoji}"
+            item_type_labels[key] = label
+
+    cache[lang] = {
+        "timestamp": now,
+        "sections": section_labels,
+        "cards": card_labels,
+        "item_types": item_type_labels,
+    }
+    if isinstance(cache_container, dict):
+        cache_container[LABEL_CACHE_KEY] = cache
+    return section_labels, card_labels, item_type_labels
+
+
+# Preload default Arabic labels for compatibility
+_ctx = SimpleNamespace(bot_data={})
+SECTION_LABELS, CARD_LABELS, ITEM_TYPE_LABELS = asyncio.run(
+    _get_label_maps(_ctx, "ar")
+)
+FILTER_LABELS = {k: ITEM_TYPE_LABELS.get(k, k) for k in ("year", "lecturer")}
 
 
 
@@ -77,6 +194,7 @@ async def _load_children(
         | tuple[int, int | str, int, str]
     ],
     user_id: int | None,
+    user_locale: str | None = None,
 ):
     """Return children for ``kind``/``ident`` using a short-lived cache."""
 
@@ -92,6 +210,18 @@ async def _load_children(
 
     children_raw = await retry(get_children, kind, ident, user_id, logger=logger)
     child_kind = CHILD_KIND.get(kind, kind)
+    lang = "en" if user_locale and user_locale.startswith("en") else "ar"
+    section_labels, card_labels, item_type_labels = await _get_label_maps(
+        context, lang
+    )
+    filter_labels = {
+        "year": item_type_labels.get(
+            "year", "By year" if lang == "en" else "حسب السنة"
+        ),
+        "lecturer": item_type_labels.get(
+            "lecturer", "By lecturer" if lang == "en" else "حسب المحاضر"
+        ),
+    }
     if kind == "section_option" and isinstance(ident, tuple) and len(ident) >= 3:
         filter_by = ident[2]
         if filter_by in ("year", "lecturer"):
@@ -99,33 +229,33 @@ async def _load_children(
     children: list = []
     if kind == "lecture" and isinstance(children_raw, dict):
         for cat in children_raw:
-            label = LECTURE_TYPE_LABELS.get(cat, cat)
+            label = item_type_labels.get(cat, cat)
             children.append((child_kind, cat, label))
     elif kind == "subject" and child_kind == "section" and isinstance(children_raw, list):
-        sections = [s for s in SECTION_LABELS if s in children_raw]
-        cards = [c for c in CARD_LABELS if c in children_raw]
+        sections = [s for s in section_labels if s in children_raw]
+        cards = [c for c in card_labels if c in children_raw]
         if len(sections) > 1:
             for sect in sections:
                 item_id = f"{ident}:{sect}"
-                children.append(("sec", item_id, SECTION_LABELS[sect]))
+                children.append(("sec", item_id, section_labels[sect]))
             if "syllabus" in cards:
-                children.append(("card", f"{ident}:syllabus", CARD_LABELS["syllabus"]))
+                children.append(("card", f"{ident}:syllabus", card_labels["syllabus"]))
                 cards.remove("syllabus")
             for card in cards:
-                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
+                children.append(("card", f"{ident}:{card}", card_labels[card]))
         elif len(sections) == 1:
             sect = sections[0]
             for filt in ("year", "lecturer"):
                 item_id = f"{ident}-{sect}-{filt}"
-                children.append(("section_option", item_id, FILTER_LABELS[filt]))
+                children.append(("section_option", item_id, filter_labels[filt]))
             if "syllabus" in cards:
-                children.append(("card", f"{ident}:syllabus", CARD_LABELS["syllabus"]))
+                children.append(("card", f"{ident}:syllabus", card_labels["syllabus"]))
                 cards.remove("syllabus")
             for card in cards:
-                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
+                children.append(("card", f"{ident}:{card}", card_labels[card]))
         else:
             for card in cards:
-                children.append(("card", f"{ident}:{card}", CARD_LABELS[card]))
+                children.append(("card", f"{ident}:{card}", card_labels[card]))
     else:
         for item in children_raw:
             if (
@@ -160,9 +290,13 @@ async def _load_children(
                 )
                 item_id = f"{subj_id}-{sect}-{item_id}-{year_id}"
             if child_kind == "section":
-                item_label = SECTION_LABELS.get(
-                    item_label, CARD_LABELS.get(item_label, item_label)
+                item_label = section_labels.get(
+                    item_label, card_labels.get(item_label, item_label)
                 )
+            elif child_kind == "card":
+                item_label = card_labels.get(item_label, item_label)
+            elif child_kind == "lecture_type":
+                item_label = item_type_labels.get(item_label, item_label)
             children.append((child_kind, item_id, item_label))
     context.user_data[LAST_CHILDREN_KEY] = {
         "node_key": node_key,
@@ -189,9 +323,10 @@ async def _render(
     """Render children for ``kind``/``ident`` at ``page`` and log timings."""
 
     user_id = update.effective_user.id if update.effective_user else None
+    user_locale = getattr(update.effective_user, "language_code", None)
 
     db_start = time.perf_counter()
-    children = await _load_children(context, kind, ident, user_id)
+    children = await _load_children(context, kind, ident, user_id, user_locale)
     db_time = time.perf_counter() - db_start
 
     render_start = time.perf_counter()
@@ -367,8 +502,15 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         parent_kind = parent[0] if parent else "root"
         parent_id = parent[1] if parent else None
         user_id = query.from_user.id if query and query.from_user else None
+        user_locale = (
+            query.from_user.language_code
+            if query and query.from_user and getattr(query.from_user, "language_code", None)
+            else getattr(update.effective_user, "language_code", None)
+        )
         try:
-            children = await _load_children(context, parent_kind, parent_id, user_id)
+            children = await _load_children(
+                context, parent_kind, parent_id, user_id, user_locale
+            )
         except Exception:
             await (query.message if query else update.message).reply_text(
                 "عذرًا، حدث خطأ أثناء جلب البيانات.")
