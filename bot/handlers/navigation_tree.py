@@ -15,7 +15,7 @@ from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
-from ..navigation.nav_stack import NavStack
+from ..navigation.nav_stack import NavStack, Node
 from ..navigation.tree import (
     get_children,
     CHILD_KIND,
@@ -379,7 +379,7 @@ async def _render_current(
     if node is None:
         kind, ident = "root", None
     else:
-        kind, ident, _ = node
+        kind, ident = node.kind, node.ident
     await _render(update, context, kind, ident, page, action)
 
 
@@ -499,8 +499,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         kind, ident_str = data.split(":", 1)
         ident = _parse_id(ident_str)
         parent = stack.peek()
-        parent_kind = parent[0] if parent else "root"
-        parent_id = parent[1] if parent else None
+        parent_kind = parent.kind if parent else "root"
+        parent_id = parent.ident if parent else None
         user_id = query.from_user.id if query and query.from_user else None
         user_locale = (
             query.from_user.language_code
@@ -569,8 +569,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             parent = stack.peek()
             subj_id = sect = year_id = None
             lecture_title = ""
-            if parent and parent[0] == "lecture" and isinstance(parent[1], tuple):
-                subj_id, sect, year_id, lecture_title = parent[1]
+            if parent and parent.kind == "lecture" and isinstance(parent.ident, tuple):
+                subj_id, sect, year_id, lecture_title = parent.ident
             try:
                 types = await get_types_for_lecture(subj_id, sect, year_id, lecture_title)
                 info = types.get(ident)
@@ -640,11 +640,11 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         if kind == "lecture" and isinstance(ident, int):
             parent = stack.peek()
             subj_id = sect = year_id = None
-            if parent and parent[0] == "lecturer" and isinstance(parent[1], tuple):
-                subj_id, sect, _lect_id, year_id = parent[1]
+            if parent and parent.kind == "lecturer" and isinstance(parent.ident, tuple):
+                subj_id, sect, _lect_id, year_id = parent.ident
             lecture_title = f"محاضرة {ident}: {label}"
             ident = (subj_id, sect, year_id, lecture_title)
-        stack.push((kind, ident, label))
+        stack.push(Node(kind, ident, label))
         # Auto-skip for single-section subjects is disabled to always show the
         # first-level menu.
         try:

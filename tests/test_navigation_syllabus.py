@@ -11,7 +11,7 @@ os.environ.setdefault("OWNER_TG_ID", "1")
 
 from bot.db import base as db_base
 from bot.db import subjects, materials
-from bot.navigation import NavStack
+from bot.navigation.nav_stack import NavStack, Node
 
 
 class DummyMessage:
@@ -57,7 +57,7 @@ def test_syllabus_section_sends_material(tmp_path):
         assert ("card", "1:syllabus", "التوصيف 📄") in children
 
         stack = NavStack(ctx.user_data)
-        stack.push(("subject", 1, "Sub1"))
+        stack.push(Node("subject", 1, "Sub1"))
 
         copy_calls = []
 

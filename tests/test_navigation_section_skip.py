@@ -11,7 +11,7 @@ os.environ.setdefault("OWNER_TG_ID", "1")
 
 from bot.db import base as db_base
 from bot.db import subjects, materials, rbac
-from bot.navigation import NavStack
+from bot.navigation.nav_stack import NavStack, Node
 
 
 CATEGORIES = [
@@ -75,9 +75,9 @@ def _setup_db(tmp_path, with_lab=False):
 
 def _build_initial_stack(ctx):
     stack = NavStack(ctx.user_data)
-    stack.push(("level", 1, "L1"))
-    stack.push(("term", (1, 1), "T1"))
-    stack.push(("term_option", (1, 1), "عرض المواد"))
+    stack.push(Node("level", 1, "L1"))
+    stack.push(Node("term", (1, 1), "T1"))
+    stack.push(Node("term_option", (1, 1), "عرض المواد"))
     return stack
 
 
@@ -106,7 +106,7 @@ def test_single_section_does_not_skip(tmp_path):
     asyncio.run(navtree.navtree_callback(update, context))
 
     stack = NavStack(ctx.user_data)
-    assert stack.peek()[0] == "subject"
+    assert stack.peek() and stack.peek().kind == "subject"
 
     keyboard = message.sent[-1][1]
     buttons = [b.callback_data for row in keyboard.inline_keyboard for b in row]
@@ -139,7 +139,7 @@ def test_multiple_sections_no_skip_and_no_categories(tmp_path):
     asyncio.run(navtree.navtree_callback(update, context))
 
     stack = NavStack(ctx.user_data)
-    assert stack.peek()[0] == "subject"
+    assert stack.peek() and stack.peek().kind == "subject"
 
     keyboard = message.sent[-1][1]
     buttons = [b.callback_data for row in keyboard.inline_keyboard for b in row]

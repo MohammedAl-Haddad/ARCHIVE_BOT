@@ -11,7 +11,7 @@ os.environ.setdefault("OWNER_TG_ID", "1")
 
 from bot.db import base as db_base
 from bot.db import subjects, materials
-from bot.navigation import NavStack
+from bot.navigation.nav_stack import NavStack, Node
 
 
 class DummyMessage:
@@ -47,10 +47,10 @@ def test_card_button_sends_material(tmp_path):
 
         ctx = SimpleNamespace(user_data={})
         stack = NavStack(ctx.user_data)
-        stack.push(("level", 1, "L1"))
-        stack.push(("term", (1, 1), "T1"))
-        stack.push(("term_option", (1, 1), "عرض المواد"))
-        stack.push(("subject", 1, "Sub1"))
+        stack.push(Node("level", 1, "L1"))
+        stack.push(Node("term", (1, 1), "T1"))
+        stack.push(Node("term_option", (1, 1), "عرض المواد"))
+        stack.push(Node("subject", 1, "Sub1"))
 
         copy_calls = []
 
@@ -84,7 +84,7 @@ def test_card_button_sends_material(tmp_path):
         )
 
         stack = NavStack(ctx.user_data)
-        assert stack.peek()[0] == "subject"
+        assert stack.peek() and stack.peek().kind == "subject"
 
     asyncio.run(_inner())
 

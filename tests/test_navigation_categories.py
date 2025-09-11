@@ -11,7 +11,7 @@ os.environ.setdefault("OWNER_TG_ID", "1")
 
 from bot.db import base as db_base
 from bot.db import subjects, materials
-from bot.navigation import NavStack
+from bot.navigation.nav_stack import NavStack, Node
 
 
 CATEGORIES = [
@@ -80,8 +80,8 @@ def test_section_category_buttons_send_material(tmp_path):
             assert ("section_option", f"1-theory-{cat}", label) in children
 
         stack = NavStack(ctx.user_data)
-        stack.push(("subject", 1, "Sub1"))
-        stack.push(("section", (1, "theory"), "نظري 📘"))
+        stack.push(Node("subject", 1, "Sub1"))
+        stack.push(Node("section", (1, "theory"), "نظري 📘"))
 
         copy_calls = []
 
