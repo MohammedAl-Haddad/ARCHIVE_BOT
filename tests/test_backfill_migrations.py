@@ -135,6 +135,28 @@ def test_legacy_scenario():
     assert snapshot['materials'] == db.execute('SELECT section_id, category_id, item_type_id FROM materials').fetchall()
     assert snapshot['topics'] == db.execute('SELECT section_id FROM topics').fetchall()
 
+    # Foreign key behaviours after backfill
+    db.execute(
+        'INSERT INTO subject_section_enable (subject_id, section_id) VALUES (?, ?)',
+        (sid, section_id),
+    )
+    db.execute(
+        'INSERT INTO section_item_types (section_id, item_type_id) VALUES (?, ?)',
+        (section_id, item_type_id),
+    )
+    db.commit()
+
+    db.execute('DELETE FROM cards WHERE id=?', (card_id,))
+    assert db.execute('SELECT category_id FROM materials').fetchone()[0] is None
+
+    db.execute('DELETE FROM sections WHERE id=?', (section_id,))
+    assert db.execute('SELECT section_id FROM materials').fetchone()[0] is None
+    assert db.execute('SELECT COUNT(*) FROM subject_section_enable').fetchone()[0] == 0
+    assert db.execute('SELECT COUNT(*) FROM section_item_types').fetchone()[0] == 0
+
+    db.execute('DELETE FROM item_types WHERE id=?', (item_type_id,))
+    assert db.execute('SELECT item_type_id FROM materials').fetchone()[0] is None
+
 
 def test_cold_start_scenario():
     db = sqlite3.connect(':memory:')
