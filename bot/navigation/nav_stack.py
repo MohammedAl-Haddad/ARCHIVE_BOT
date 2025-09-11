@@ -1,19 +1,25 @@
 from __future__ import annotations
 
-from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 # Key used to store the navigation stack in ``context.user_data``
 NAV_STACK_KEY = "nav_stack"
 
-# Node representation: (kind, id, title)
-Node = Tuple[str, Optional[int | str | tuple[int, int]], str]
+@dataclass
+class Node:
+    """Represents a single entry on the navigation stack."""
+
+    kind: str
+    ident: Optional[Any]
+    title: str = ""
 
 
 class NavStack:
     """Simple navigation stack backed by ``context.user_data``.
 
-    The stack is stored under :data:`NAV_STACK_KEY` in ``user_data`` and uses a
-    list of tuples ``(kind, id, title)`` to ease serialization.
+    The stack is stored under :data:`NAV_STACK_KEY` in ``user_data`` and uses
+    :class:`Node` instances to ease serialization.
     """
 
     def __init__(self, user_data: Dict) -> None:
@@ -49,4 +55,9 @@ class NavStack:
     # ------------------------------------------------------------------
     def path_text(self) -> str:
         """Return a textual representation of the current path."""
-        return " / ".join(title for _, _, title in self._stack if title)
+        return " / ".join(node.title for node in self._stack if node.title)
+
+    # ------------------------------------------------------------------
+    def state(self) -> List[Node]:
+        """Return a copy of the current navigation stack."""
+        return list(self._stack)

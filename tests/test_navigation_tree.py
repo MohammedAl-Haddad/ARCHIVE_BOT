@@ -11,7 +11,7 @@ os.environ.setdefault("BOT_TOKEN", "test")
 os.environ.setdefault("ARCHIVE_CHANNEL_ID", "1")
 os.environ.setdefault("OWNER_TG_ID", "1")
 
-from bot.navigation import NavStack
+from bot.navigation.nav_stack import NavStack, Node
 
 
 class DummyMessage:
@@ -33,12 +33,12 @@ def navtree():
 def test_nav_stack_path():
     ud_new = {}
     stack = NavStack(ud_new)
-    stack.push(("level", 1, "L1"))
-    stack.push(("term", 1, "T1"))
-    stack.push(("subject", 1, "S1"))
-    stack.push(("year", 1, "Y1"))
-    stack.push(("section", "sec", "Sec"))
-    stack.push(("lecture", None, "Mat"))
+    stack.push(Node("level", 1, "L1"))
+    stack.push(Node("term", 1, "T1"))
+    stack.push(Node("subject", 1, "S1"))
+    stack.push(Node("year", 1, "Y1"))
+    stack.push(Node("section", "sec", "Sec"))
+    stack.push(Node("lecture", None, "Mat"))
     new_path = stack.path_text()
 
     assert new_path == "L1 / T1 / S1 / Y1 / Sec / Mat"
@@ -73,8 +73,8 @@ def test_db_time_logged(large_dataset, caplog):
 def test_back_button_pops_stack(monkeypatch, navtree):
     context = SimpleNamespace(user_data={})
     stack = NavStack(context.user_data)
-    stack.push(("level", 1, "L1"))
-    stack.push(("term", 2, "T1"))
+    stack.push(Node("level", 1, "L1"))
+    stack.push(Node("term", 2, "T1"))
 
     query = SimpleNamespace(data="nav:back", message=DummyMessage(), answer=AsyncMock())
     update = SimpleNamespace(callback_query=query, effective_user=None)
@@ -91,9 +91,9 @@ def test_back_button_pops_stack(monkeypatch, navtree):
 def test_back_from_single_section_returns_to_subject(monkeypatch, navtree):
     context = SimpleNamespace(user_data={})
     stack = NavStack(context.user_data)
-    stack.push(("term", 1, "T1"))
-    stack.push(("subject", 7, "S1"))
-    stack.push(("section", "7:only", "Only"))
+    stack.push(Node("term", 1, "T1"))
+    stack.push(Node("subject", 7, "S1"))
+    stack.push(Node("section", "7:only", "Only"))
 
     query = SimpleNamespace(
         data="nav:back",
