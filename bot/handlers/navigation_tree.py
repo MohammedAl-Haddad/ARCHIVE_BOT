@@ -2,29 +2,23 @@ from __future__ import annotations
 
 """Handlers for exploring the navigation tree via inline keyboards.
 
-Navigation flow: level → term → subject → section → filter (year/lecturer) → ….
+Navigation flow: subject → section → year/lecturer → lecture → lecture type.
 """
 
-from typing import Optional
+from typing import Optional, Tuple
 import time
 import logging
-import asyncio
-from types import SimpleNamespace
 
 from telegram import Update
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
-from ..navigation.nav_stack import NavStack, Node
+from ..navigation import NavStack, Node
+from ..navigation.nav_builder import build_menu
 from ..navigation.tree import (
-    get_children,
-    CHILD_KIND,
-    CACHE_TTL_SECONDS,
     get_latest_material_by_category,
-    SECTION_CATEGORY_LABELS,
     CATEGORY_SECTIONS,
 )
-from ..keyboards.builders.paginated import build_children_keyboard
 from ..keyboards.builders.main_menu import build_main_menu
 from ..db import (
     is_owner,
@@ -34,306 +28,58 @@ from ..db import (
     get_types_for_lecture,
     get_materials_by_card,
 )
-from ..repo import taxonomy
-from ..utils.retry import retry
 
 logger = logging.getLogger(__name__)
 
-LAST_CHILDREN_KEY = "last_children"
-LAST_CHILDREN_TTL_SECONDS = CACHE_TTL_SECONDS
 
-LABEL_CACHE_KEY = "navtree_label_cache"
-LABEL_CACHE_TTL_SECONDS = 300
-
-
-def _label_with_emoji(key: str, row: dict, emoji_map: dict) -> str:
-    """Return label optionally suffixed with an emoji from DB or settings."""
-
-    label = row.get("label", key)
-    emoji = row.get("emoji") or emoji_map.get(key)
-    if emoji:
-        label = f"{label} {emoji}"
-    return label
-
-
-async def _get_label_maps(context: ContextTypes.DEFAULT_TYPE, lang: str):
-    """Fetch label mappings for sections, cards and item types."""
-
-    cache_container = getattr(context, "bot_data", {})
-    cache = cache_container.get(LABEL_CACHE_KEY, {}) if isinstance(cache_container, dict) else {}
-    now = time.time()
-    cached = cache.get(lang)
-    if cached and now - cached.get("timestamp", 0) < LABEL_CACHE_TTL_SECONDS:
-        return cached["sections"], cached["cards"], cached["item_types"]
-
-    try:
-        sections = await taxonomy.get_sections(lang=lang)
-        cards = await taxonomy.get_cards(lang=lang)
-        item_types = await taxonomy.get_item_types(lang=lang)
-    except Exception:
-        sections = cards = item_types = []
-
-    try:
-        sections_en = sections if lang == "en" else await taxonomy.get_sections(lang="en")
-        cards_en = cards if lang == "en" else await taxonomy.get_cards(lang="en")
-        item_types_en = item_types if lang == "en" else await taxonomy.get_item_types(lang="en")
-    except Exception:
-        sections_en, cards_en, item_types_en = sections, cards, item_types
-
-    emoji_map = cache_container.get("emoji_map") if isinstance(cache_container, dict) else None
-    if emoji_map is None:
-        emoji_map = {
-            "theory": "📘",
-            "discussion": "💬",
-            "lab": "🔬",
-            "field_trip": "🚌",
-            "syllabus": "📄",
-            "glossary": "📖",
-            "practical": "⚙️",
-            "references": "📚",
-            "skills": "🧠",
-            "open_source_projects": "🛠️",
-        }
-
-    section_labels = {}
-    for base, localized in zip(sections_en, sections):
-        key = base.get("key") or base.get("label")
-        section_labels[key] = _label_with_emoji(key, localized, emoji_map)
-
-    card_labels = {}
-    for base, localized in zip(cards_en, cards):
-        key = base.get("key") or base.get("label")
-        card_labels[key] = _label_with_emoji(key, localized, emoji_map)
-
-    item_type_labels = {}
-    for base, localized in zip(item_types_en, item_types):
-        key = base.get("key") or base.get("label")
-        item_type_labels[key] = _label_with_emoji(key, localized, emoji_map)
-
-    if not section_labels:
-        defaults = {
-            "theory": {"ar": "نظري", "en": "Theory"},
-            "discussion": {"ar": "مناقشة", "en": "Discussion"},
-            "lab": {"ar": "عملي", "en": "Lab"},
-            "field_trip": {"ar": "رحلة", "en": "Field Trip"},
-        }
-        for key, labels in defaults.items():
-            label = labels.get(lang, key)
-            emoji = emoji_map.get(key)
-            if emoji:
-                label = f"{label} {emoji}"
-            section_labels[key] = label
-
-    if not card_labels:
-        defaults = {
-            "syllabus": {"ar": "التوصيف", "en": "Syllabus"},
-            "glossary": {"ar": "المفردات الدراسية", "en": "Glossary"},
-            "practical": {"ar": "الواقع التطبيقي", "en": "Practical"},
-            "references": {"ar": "مراجع", "en": "References"},
-            "skills": {"ar": "مهارات", "en": "Skills"},
-            "open_source_projects": {
-                "ar": "مشاريع مفتوحة المصدر",
-                "en": "Open Source Projects",
-            },
-        }
-        for key, labels in defaults.items():
-            label = labels.get(lang, key)
-            emoji = emoji_map.get(key)
-            if emoji:
-                label = f"{label} {emoji}"
-            card_labels[key] = label
-
-    if not item_type_labels:
-        defaults = {
-            "lecture": {"ar": "ملف المحاضرة", "en": "Lecture"},
-            "slides": {"ar": "السلايدات", "en": "Slides"},
-            "audio": {"ar": "الصوت", "en": "Audio"},
-            "board_images": {"ar": "صور اللوح", "en": "Board Images"},
-            "video": {"ar": "الفيديو", "en": "Video"},
-            "mind_map": {"ar": "الخريطة الذهنية", "en": "Mind Map"},
-            "transcript": {"ar": "التفريغ", "en": "Transcript"},
-            "related": {"ar": "مواد مرتبطة", "en": "Related"},
-            "year": {"ar": "حسب السنة", "en": "By year"},
-            "lecturer": {"ar": "حسب المحاضر", "en": "By lecturer"},
-        }
-        for key, labels in defaults.items():
-            label = labels.get(lang, key)
-            emoji = emoji_map.get(key)
-            if emoji:
-                label = f"{label} {emoji}"
-            item_type_labels[key] = label
-
-    cache[lang] = {
-        "timestamp": now,
-        "sections": section_labels,
-        "cards": card_labels,
-        "item_types": item_type_labels,
-    }
-    if isinstance(cache_container, dict):
-        cache_container[LABEL_CACHE_KEY] = cache
-    return section_labels, card_labels, item_type_labels
-
-
-# Preload default Arabic labels for compatibility
-_ctx = SimpleNamespace(bot_data={})
-SECTION_LABELS, CARD_LABELS, ITEM_TYPE_LABELS = asyncio.run(
-    _get_label_maps(_ctx, "ar")
-)
-FILTER_LABELS = {k: ITEM_TYPE_LABELS.get(k, k) for k in ("year", "lecturer")}
-
-
-
-async def _load_children(
-    context: ContextTypes.DEFAULT_TYPE,
-    kind: str,
-    ident: Optional[
-        int
-        | str
-        | tuple[int, int | str]
-        | tuple[int, int | str, str]
-        | tuple[int, int | str, int, str]
-    ],
-    user_id: int | None,
-    user_locale: str | None = None,
-):
-    """Return children for ``kind``/``ident`` using a short-lived cache."""
-
-    node_key = (kind, ident)
-    now = time.time()
-    cached = context.user_data.get(LAST_CHILDREN_KEY)
-    if (
-        isinstance(cached, dict)
-        and cached.get("node_key") == node_key
-        and now - cached.get("timestamp", 0) < LAST_CHILDREN_TTL_SECONDS
-    ):
-        return cached["children"]
-
-    children_raw = await retry(get_children, kind, ident, user_id, logger=logger)
-    child_kind = CHILD_KIND.get(kind, kind)
-    lang = "en" if user_locale and user_locale.startswith("en") else "ar"
-    section_labels, card_labels, item_type_labels = await _get_label_maps(
-        context, lang
-    )
-    filter_labels = {
-        "year": item_type_labels.get(
-            "year", "By year" if lang == "en" else "حسب السنة"
-        ),
-        "lecturer": item_type_labels.get(
-            "lecturer", "By lecturer" if lang == "en" else "حسب المحاضر"
-        ),
-    }
-    if kind == "section_option" and isinstance(ident, tuple) and len(ident) >= 3:
-        filter_by = ident[2]
-        if filter_by in ("year", "lecturer"):
-            child_kind = filter_by
-    children: list = []
-    if kind == "lecture" and isinstance(children_raw, dict):
-        for cat in children_raw:
-            label = item_type_labels.get(cat, cat)
-            children.append((child_kind, cat, label))
-    elif kind == "subject" and child_kind == "section" and isinstance(children_raw, list):
-        sections = [s for s in section_labels if s in children_raw]
-        cards = [c for c in card_labels if c in children_raw]
-        if len(sections) > 1:
-            for sect in sections:
-                item_id = f"{ident}:{sect}"
-                children.append(("sec", item_id, section_labels[sect]))
-            if "syllabus" in cards:
-                children.append(("card", f"{ident}:syllabus", card_labels["syllabus"]))
-                cards.remove("syllabus")
-            for card in cards:
-                children.append(("card", f"{ident}:{card}", card_labels[card]))
-        elif len(sections) == 1:
-            sect = sections[0]
-            for filt in ("year", "lecturer"):
-                item_id = f"{ident}-{sect}-{filt}"
-                children.append(("section_option", item_id, filter_labels[filt]))
-            if "syllabus" in cards:
-                children.append(("card", f"{ident}:syllabus", card_labels["syllabus"]))
-                cards.remove("syllabus")
-            for card in cards:
-                children.append(("card", f"{ident}:{card}", card_labels[card]))
-        else:
-            for card in cards:
-                children.append(("card", f"{ident}:{card}", card_labels[card]))
-    else:
-        for item in children_raw:
-            if (
-                kind == "lecturer"
-                and child_kind == "lecture"
-                and isinstance(item, dict)
-            ):
-                item_id = item.get("lecture_no")
-                item_label = item.get("title", str(item_id))
-            elif isinstance(item, (tuple, list)):
-                item_id = item[0]
-                item_label = item[1] if len(item) > 1 else str(item[0])
-            else:
-                item_id = item
-                item_label = str(item)
-            if kind == "level" and child_kind == "term":
-                item_id = f"{ident}-{item_id}"
-            elif kind == "section" and child_kind == "section_option":
-                # After selecting a section, show filter options before listing years/lecturers
-                subj_id, sect = ident if isinstance(ident, tuple) else (ident, None)
-                item_id = f"{subj_id}-{sect}-{item_id}"
-            elif kind == "section_option" and child_kind in {"year", "lecturer"}:
-                # Apply the chosen filter to generate year or lecturer nodes
-                subj_id, sect, _filt = ident if isinstance(ident, tuple) else (ident, None, None)
-                item_id = f"{subj_id}-{sect}-{item_id}"
-            elif kind == "year" and child_kind == "year_option":
-                subj_id, sect, year_id = ident if isinstance(ident, tuple) else (ident, None, None)
-                item_id = f"{subj_id}-{sect}-{year_id}-{item_id}"
-            elif kind == "year_option" and child_kind == "lecturer":
-                subj_id, sect, year_id, _opt = (
-                    ident if isinstance(ident, tuple) else (ident, None, None, None)
-                )
-                item_id = f"{subj_id}-{sect}-{item_id}-{year_id}"
-            if child_kind == "section":
-                item_label = section_labels.get(
-                    item_label, card_labels.get(item_label, item_label)
-                )
-            elif child_kind == "card":
-                item_label = card_labels.get(item_label, item_label)
-            elif child_kind == "lecture_type":
-                item_label = item_type_labels.get(item_label, item_label)
-            children.append((child_kind, item_id, item_label))
-    context.user_data[LAST_CHILDREN_KEY] = {
-        "node_key": node_key,
-        "timestamp": now,
-        "children": children,
-    }
-    return children
+def _extract_state(
+    stack: NavStack,
+) -> Tuple[Optional[int], Optional[str], Optional[int], Optional[int], Optional[int]]:
+    subject_id = section_id = year_id = lecturer_id = lecture_no = None
+    for node in stack.state():
+        if node.kind == "subject":
+            subject_id = node.ident
+        elif node.kind == "section":
+            section_id = node.ident
+        elif node.kind == "year":
+            year_id = node.ident
+        elif node.kind == "lecturer":
+            lecturer_id = node.ident
+        elif node.kind == "lecture":
+            lecture_no = node.ident
+    return subject_id, section_id, year_id, lecturer_id, lecture_no
 
 
 async def _render(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    kind: str,
-    ident: Optional[
-        int
-        | str
-        | tuple[int, int | str]
-        | tuple[int, int | str, str]
-        | tuple[int, int | str, int, str]
-    ],
     page: int,
     action: str,
 ) -> None:
-    """Render children for ``kind``/``ident`` at ``page`` and log timings."""
+    """Render current navigation state using :func:`build_menu`."""
 
-    user_id = update.effective_user.id if update.effective_user else None
-    user_locale = getattr(update.effective_user, "language_code", None)
+    user_id = update.effective_user.id if update.effective_user else 0
+    user_locale = getattr(update.effective_user, "language_code", None) or "ar"
+    stack = NavStack(context.user_data)
+    subject_id, section_id, year_id, lecturer_id, lecture_no = _extract_state(stack)
+    if subject_id is None:
+        return
 
     db_start = time.perf_counter()
-    children = await _load_children(context, kind, ident, user_id, user_locale)
+    menu = build_menu(
+        user_id,
+        subject_id,
+        section_id,
+        year_id,
+        lecturer_id,
+        lecture_no,
+        page=page,
+        locale=user_locale,
+    )
     db_time = time.perf_counter() - db_start
 
-    render_start = time.perf_counter()
-    stack = NavStack(context.user_data)
-    keyboard = build_children_keyboard(children, page, include_back=True)
     text = stack.path_text() or "اختر عنصرًا:"
-    render_time = time.perf_counter() - render_start
+    keyboard = menu.keyboard
 
     if update.callback_query:
         await update.callback_query.answer()
@@ -354,11 +100,10 @@ async def _render(
     message_edit_time = time.perf_counter() - message_start
 
     logger.info(
-        "%s path='%s' db_time=%.3fms render_time=%.3fms message_edit_time=%.3fms",
+        "%s path='%s' db_time=%.3fms message_edit_time=%.3fms",
         action,
-        NavStack(context.user_data).path_text(),
+        stack.path_text(),
         db_time * 1000,
-        render_time * 1000,
         message_edit_time * 1000,
     )
 
@@ -374,13 +119,7 @@ def _parse_id(value: str) -> int | tuple[int, int | str] | tuple[int, int | str,
 async def _render_current(
     update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 1, action: str = "selection"
 ) -> None:
-    stack = NavStack(context.user_data)
-    node = stack.peek()
-    if node is None:
-        kind, ident = "root", None
-    else:
-        kind, ident = node.kind, node.ident
-    await _render(update, context, kind, ident, page, action)
+    await _render(update, context, page, action)
 
 
 async def navtree_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -390,10 +129,11 @@ async def navtree_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     while stack.pop():
         pass
     try:
-        await _render(update, context, "root", None, 1, action="selection")
+        await _render(update, context, 1, action="selection")
     except Exception:
         await update.effective_message.reply_text(
-            "عذرًا، حدث خطأ. حاول مرة أخرى لاحقًا.")
+            "عذرًا، حدث خطأ. حاول مرة أخرى لاحقًا."
+        )
         logger.exception("navtree_start failed")
 
 
@@ -425,7 +165,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                     )
             except Exception:
                 await (query.message if query else update.message).reply_text(
-                    "عذرًا، حدث خطأ أثناء الرجوع للقائمة الرئيسية.")
+                    "عذرًا، حدث خطأ أثناء الرجوع للقائمة الرئيسية."
+                )
                 logger.exception("Error returning to main menu")
             return
         try:
@@ -436,7 +177,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if popped:
                 stack.push(popped)
             await (query.message if query else update.message).reply_text(
-                "عذرًا، حدث خطأ وتم الرجوع للمستوى السابق.")
+                "عذرًا، حدث خطأ وتم الرجوع للمستوى السابق."
+            )
             logger.exception("Error during pop")
         return
 
@@ -448,7 +190,8 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 await query.answer()
         except Exception:
             await (query.message if query else update.message).reply_text(
-                "عذرًا، تعذر عرض الصفحة المطلوبة.")
+                "عذرًا، تعذر عرض الصفحة المطلوبة."
+            )
             logger.exception("Error during page selection")
         return
 
@@ -465,9 +208,7 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if mats:
                 for _mid, _title, url, chat_id, msg_id in mats:
                     if chat_id and msg_id:
-                        target_chat = (
-                            query.message.chat_id if query else update.effective_chat.id
-                        )
+                        target_chat = query.message.chat_id if query else update.effective_chat.id
                         thread_id = (
                             query.message.message_thread_id if query and query.message else None
                         )
@@ -481,11 +222,11 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                         await (query.message if query else update.message).reply_text(url)
             else:
                 await (query.message if query else update.message).reply_text(
-                    "المادة غير متاحة بعد.",
+                    "المادة غير متاحة بعد."
                 )
         except Exception:
             await (query.message if query else update.message).reply_text(
-                "عذرًا، تعذر جلب المادة.",
+                "عذرًا، تعذر جلب المادة."
             )
             logger.exception("Error sending card material")
         if query:
@@ -498,81 +239,75 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if ":" in data:
         kind, ident_str = data.split(":", 1)
         ident = _parse_id(ident_str)
-        parent = stack.peek()
-        parent_kind = parent.kind if parent else "root"
-        parent_id = parent.ident if parent else None
-        user_id = query.from_user.id if query and query.from_user else None
+
+        user_id = query.from_user.id if query and query.from_user else 0
         user_locale = (
             query.from_user.language_code
             if query and query.from_user and getattr(query.from_user, "language_code", None)
             else getattr(update.effective_user, "language_code", None)
         )
-        try:
-            children = await _load_children(
-                context, parent_kind, parent_id, user_id, user_locale
-            )
-        except Exception:
-            await (query.message if query else update.message).reply_text(
-                "عذرًا، حدث خطأ أثناء جلب البيانات.")
-            logger.exception("Error loading children for selection")
-            return
+
+        subj_id, sect_id, year_id, lect_id, lect_no = _extract_state(stack)
+        menu = build_menu(
+            user_id,
+            subj_id,
+            sect_id,
+            year_id,
+            lect_id,
+            lect_no,
+            page=1,
+            locale=user_locale or "ar",
+        )
+
         label = ""
-        for _, item_id, item_label in children:
-            if str(item_id) == ident_str:
+        for btn_kind, item_id, item_label in menu.buttons:
+            if btn_kind == kind and str(item_id) == ident_str:
                 label = item_label
                 break
-        if kind == "section_option":
-            subj_id = sect = cat = None
-            if isinstance(ident, tuple) and len(ident) >= 3:
-                subj_id, sect, cat = ident
-            if cat in CATEGORY_SECTIONS:
-                try:
-                    res = await get_latest_material_by_category(subj_id, sect, cat)
-                    if res:
-                        chat_id, msg_id, url = res
-                        if chat_id and msg_id:
-                            target_chat = (
-                                query.message.chat_id
-                                if query
-                                else update.effective_chat.id
-                            )
-                            thread_id = (
-                                query.message.message_thread_id
-                                if query and query.message
-                                else None
-                            )
-                            await context.bot.copy_message(
-                                chat_id=target_chat,
-                                from_chat_id=chat_id,
-                                message_id=msg_id,
-                                message_thread_id=thread_id,
-                            )
-                        elif url:
-                            await (query.message if query else update.message).reply_text(url)
-                        else:
-                            await (query.message if query else update.message).reply_text(
-                                "المادة غير متاحة بعد.",
-                            )
+
+        if kind == "section_option" and ident in CATEGORY_SECTIONS:
+            cat = ident
+            try:
+                res = await get_latest_material_by_category(subj_id, sect_id, cat)
+                if res:
+                    chat_id, msg_id, url = res
+                    if chat_id and msg_id:
+                        target_chat = query.message.chat_id if query else update.effective_chat.id
+                        thread_id = (
+                            query.message.message_thread_id if query and query.message else None
+                        )
+                        await context.bot.copy_message(
+                            chat_id=target_chat,
+                            from_chat_id=chat_id,
+                            message_id=msg_id,
+                            message_thread_id=thread_id,
+                        )
+                    elif url:
+                        await (query.message if query else update.message).reply_text(url)
                     else:
                         await (query.message if query else update.message).reply_text(
-                            "المادة غير متاحة بعد.",
+                            "المادة غير متاحة بعد."
                         )
-                except Exception:
+                else:
                     await (query.message if query else update.message).reply_text(
-                        "عذرًا، تعذر جلب المادة.",
+                        "المادة غير متاحة بعد."
                     )
-                    logger.exception("Error sending category material")
-                if query:
-                    await query.answer()
-                return
+            except Exception:
+                await (query.message if query else update.message).reply_text(
+                    "عذرًا، تعذر جلب المادة."
+                )
+                logger.exception("Error sending category material")
+            if query:
+                await query.answer()
+            return
+
         if kind == "lecture_type":
-            parent = stack.peek()
-            subj_id = sect = year_id = None
-            lecture_title = ""
-            if parent and parent.kind == "lecture" and isinstance(parent.ident, tuple):
-                subj_id, sect, year_id, lecture_title = parent.ident
+            subj_val, sect_val, year_val, lecture_title = subj_id, sect_id, year_id, ""
+            top = stack.peek()
+            if top and top.kind == "lecture" and isinstance(top.ident, tuple):
+                subj_val, sect_val, year_val, lecture_title = top.ident
             try:
-                types = await get_types_for_lecture(subj_id, sect, year_id, lecture_title)
+                types = await get_types_for_lecture(subj_val, sect_val, year_val, lecture_title)
                 info = types.get(ident)
                 if info:
                     _id, url, chat_id, msg_id = info
@@ -605,19 +340,18 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             if query:
                 await query.answer()
             return
+
         if kind == "term_option":
             if ident_str != "subjects":
-                level_id, term_id = (
-                    parent_id if isinstance(parent_id, tuple) else (None, parent_id)
-                )
+                level_id = term_id = None
                 try:
                     res = await get_latest_term_resource(level_id, term_id, ident_str)
                     if res:
                         chat_id, msg_id = res
                         target_chat = query.message.chat_id if query else update.effective_chat.id
-                        thread_id = None
-                        if query and query.message:
-                            thread_id = query.message.message_thread_id
+                        thread_id = (
+                            query.message.message_thread_id if query and query.message else None
+                        )
                         await context.bot.copy_message(
                             chat_id=target_chat,
                             from_chat_id=chat_id,
@@ -636,19 +370,15 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
                 if query:
                     await query.answer()
                 return
-            ident = parent_id
+            ident = None
+
         if kind == "lecture" and isinstance(ident, int):
-            parent = stack.peek()
-            subj_id = sect = year_id = None
-            if parent and parent.kind == "lecturer" and isinstance(parent.ident, tuple):
-                subj_id, sect, _lect_id, year_id = parent.ident
-            lecture_title = f"محاضرة {ident}: {label}"
-            ident = (subj_id, sect, year_id, lecture_title)
+            lecture_title = label
+            ident = (subj_id, sect_id, year_id, lecture_title)
+
         stack.push(Node(kind, ident, label))
-        # Auto-skip for single-section subjects is disabled to always show the
-        # first-level menu.
         try:
-            await _render(update, context, kind, ident, 1, action="push")
+            await _render(update, context, 1, action="push")
             if query:
                 await query.answer()
         except Exception:
@@ -664,3 +394,4 @@ async def navtree_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await query.answer()
         except Exception:
             logger.exception("Error answering callback query")
+
