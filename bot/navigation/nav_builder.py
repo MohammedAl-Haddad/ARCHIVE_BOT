@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
+import time
+from typing import Dict, List, Tuple
 
 from ..repo import taxonomy, materials
 from ..config import PER_PAGE as CONFIG_PER_PAGE
@@ -31,6 +32,18 @@ class Menu:
     children: List[Button]
 
 
+# Cache configuration ------------------------------------------------------
+CACHE_TTL_SECONDS = 90
+# cache key -> (timestamp, Menu)
+_cache: Dict[Tuple[int, str], Tuple[float, Menu]] = {}
+
+
+def invalidate() -> None:
+    """Clear cached menus."""
+
+    _cache.clear()
+
+
 async def build_menu(
     subject_id: int,
     *,
@@ -45,9 +58,17 @@ async def build_menu(
     ``(kind, identifier, label)``.
     """
 
+    key = (subject_id, lang)
+    now = time.time()
+    cached = _cache.get(key)
+    if cached and now - cached[0] < CACHE_TTL_SECONDS:
+        return cached[1]
+
     # Bail out quickly if the subject itself has no materials.
     if await materials.count_by_subject(subject_id) == 0:
-        return Menu(children=[])
+        menu = Menu(children=[])
+        _cache[key] = (now, menu)
+        return menu
 
     buttons: List[Button] = []
 
@@ -80,4 +101,6 @@ async def build_menu(
                 ident = f"{section_id}-{item_type['id']}"
                 buttons.append(("item_type", ident, item_type["label"]))
 
-    return Menu(children=buttons)
+    menu = Menu(children=buttons)
+    _cache[key] = (now, menu)
+    return menu

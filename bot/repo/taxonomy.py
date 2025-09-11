@@ -3,6 +3,12 @@ from __future__ import annotations
 
 from . import connect, translate_errors
 
+# Navigation cache invalidation helper
+def _invalidate_nav_cache() -> None:
+    from ..navigation import nav_builder
+
+    nav_builder.invalidate()
+
 # ---------------------------------------------------------------------------
 # Sections
 # ---------------------------------------------------------------------------
@@ -28,6 +34,7 @@ async def create_section(
         )
         await db.commit()
         section_id = cur.lastrowid
+    _invalidate_nav_cache()
 
     return await get_section(section_id, lang=lang, include_disabled=True)
 
@@ -82,6 +89,7 @@ async def update_section(
     async with connect() as db:
         await db.execute(f"UPDATE sections SET {cols} WHERE id=?", params)
         await db.commit()
+    _invalidate_nav_cache()
     return await get_section(section_id, lang=lang, include_disabled=True)
 
 
@@ -92,6 +100,7 @@ async def delete_section(section_id: int) -> None:
     async with connect() as db:
         await db.execute("DELETE FROM sections WHERE id=?", (section_id,))
         await db.commit()
+    _invalidate_nav_cache()
 
 
 @translate_errors
@@ -148,6 +157,7 @@ async def create_card(
         )
         await db.commit()
         card_id = cur.lastrowid
+    _invalidate_nav_cache()
 
     return await get_card(card_id, lang=lang, include_disabled=True)
 
@@ -200,6 +210,7 @@ async def update_card(
     async with connect() as db:
         await db.execute(f"UPDATE cards SET {cols} WHERE id=?", params)
         await db.commit()
+    _invalidate_nav_cache()
     return await get_card(card_id, lang=lang, include_disabled=True)
 
 
@@ -210,6 +221,7 @@ async def delete_card(card_id: int) -> None:
     async with connect() as db:
         await db.execute("DELETE FROM cards WHERE id=?", (card_id,))
         await db.commit()
+    _invalidate_nav_cache()
 
 
 @translate_errors
@@ -279,6 +291,7 @@ async def create_item_type(
         )
         await db.commit()
         item_type_id = cur.lastrowid
+    _invalidate_nav_cache()
 
     return await get_item_type(item_type_id, lang=lang, include_disabled=True)
 
@@ -332,6 +345,7 @@ async def update_item_type(
     async with connect() as db:
         await db.execute(f"UPDATE item_types SET {cols} WHERE id=?", params)
         await db.commit()
+    _invalidate_nav_cache()
     return await get_item_type(item_type_id, lang=lang, include_disabled=True)
 
 
@@ -342,6 +356,7 @@ async def delete_item_type(item_type_id: int) -> None:
     async with connect() as db:
         await db.execute("DELETE FROM item_types WHERE id=?", (item_type_id,))
         await db.commit()
+    _invalidate_nav_cache()
 
 
 @translate_errors
@@ -399,6 +414,7 @@ async def set_section_item_type(
             (section_id, item_type_id, int(is_enabled), sort_order),
         )
         await db.commit()
+    _invalidate_nav_cache()
 
 
 @translate_errors
@@ -460,6 +476,7 @@ async def set_subject_section_enable(
             (subject_id, section_id, int(is_enabled), sort_order),
         )
         await db.commit()
+    _invalidate_nav_cache()
 
 
 @translate_errors
